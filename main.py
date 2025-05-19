@@ -2,8 +2,10 @@
 import cv2
 import numpy as np
 import math
+from scipy.optimize import minimize
 
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
+TRIANGLE_CENTER = np.array([4.5, 4.5 * np.sqrt(3)/2, 0])  # Point camera is looking at
 
 def estimate_undistorted_radius(major, minor):
     a = major / 2
@@ -11,7 +13,63 @@ def estimate_undistorted_radius(major, minor):
     r_undistorted = math.sqrt(a * b)  # geometric mean
     return r_undistorted
 
+def calculate_camera_error(pos, distances, ball_positions):
+    """
+    Calculate error between expected distances and actual distances,
+    taking into account that camera is looking at triangle center.
+    """
+    pos = np.array(pos)
+    error = 0
+    
+    # Vector from camera to center (viewing direction)
+    to_center = TRIANGLE_CENTER - pos
+    to_center = to_center / np.linalg.norm(to_center)
+    
+    for ball_pos, target_dist in zip(ball_positions, distances):
+        # Vector from camera to ball
+        to_ball = ball_pos - pos
+        dist = np.linalg.norm(to_ball)
+        
+        # Calculate angle between viewing direction and ball direction
+        to_ball_norm = to_ball / dist
+        cos_angle = np.dot(to_ball_norm, to_center)
+        
+        # Penalize both distance error and deviation from expected viewing angle
+        angle_error = 1 - cos_angle  # 0 when looking directly at ball
+        dist_error = (dist - target_dist) ** 2
+        
+        error += dist_error + 5 * angle_error  # Weight angle error more
+    
+    return error
 
+def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None):
+    """
+    Estimate camera position using optimization.
+    Takes into account that camera is always looking at triangle center.
+    """
+    # Ball positions in world space
+    ball_positions = [
+        np.array([4.5, 9*np.sqrt(3)/2, 0]),  # Red
+        np.array([9, 0, 0]),                  # Green
+        np.array([0, 0, 0])                   # Blue
+    ]
+    
+    distances = [red_dist, green_dist, blue_dist]
+    
+    if initial_guess is None:
+        # Make initial guess based on average distance
+        avg_dist = sum(distances) / 3
+        initial_guess = [4.5, -avg_dist/2, avg_dist]
+    
+    # Use optimization to find best camera position
+    result = minimize(
+        calculate_camera_error,
+        initial_guess,
+        args=(distances, ball_positions),
+        method='Nelder-Mead'
+    )
+    
+    return result.x
 
 def apex_coordinates(a, b, c, side_length=9):
     """
@@ -76,7 +134,7 @@ ball_sizes = []
 count = 0
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("videos/1.mp4")
+    cap = cv2.VideoCapture("videos/2.mp4")
 
     # Check if the video was opened successfully
     if not cap.isOpened():
@@ -271,42 +329,48 @@ if __name__ == '__main__':
     # Release the video capture object
     cap.release()
 
-    print(original_ball_sizes)
+    print("Original ball sizes:", original_ball_sizes)
+    print("Number of frames:", len(ball_sizes))
 
-    # calculate original distance
-    bisec = math.sqrt(9*9 + 4.5*4.5)
-    line_to_center = 2/3 * bisec
-    original_distance = math.sqrt(line_to_center*line_to_center + 18*18)
-
-    print(f"Distance: {original_distance}")
-
-    print(ball_sizes)
-
+    # Estimate initial camera position (approximately 18 units away from center)
+    initial_pos = np.array([4.5, -9, 18])
+    
     coords_x, coords_z = [], []
-    for red_size, green_size, blue_size in ball_sizes:
-        # Calculate the distances
-        red_distance = original_distance * (red_size / original_ball_sizes[RED])
-        green_distance = original_distance * (green_size / original_ball_sizes[GREEN])
-        blue_distance = original_distance * (blue_size / original_ball_sizes[BLUE])
-
-        print(f"Red distance: {red_distance:.2f}")
-        print(f"Green distance: {green_distance:.2f}")
-        print(f"Blue distance: {blue_distance:.2f}")
-
-        apex = apex_coordinates(red_distance, green_distance, blue_distance)
-        print(f"Apex coordinates: {apex}")
-
-        # x (left/ right. larger is right), y (up/down, ignore for now), z (forward/backward. larger is back)
-        x, y, z = apex
-
-        print(x, z)
-
-        # Draw lines between the coordinates using matplotlib
-        import matplotlib.pyplot as plt
-
-        # Store the coordinates for plotting
-        coords_x.append(x)
-        coords_z.append(z)
+    prev_pos = initial_pos  # Use previous position as initial guess for next frame
+    
+    for frame_idx, (red_size, green_size, blue_size) in enumerate(ball_sizes):
+        try:
+            # Calculate approximate distances based on size ratios
+            # Note: when the ball is viewed at an angle, it appears smaller than it actually is
+            approx_distances = []
+            for size, orig_size in zip([red_size, green_size, blue_size], 
+                                     [original_ball_sizes[RED], original_ball_sizes[GREEN], original_ball_sizes[BLUE]]):
+                dist = 18 * (orig_size / size)  # 18 is approximate initial distance
+                approx_distances.append(dist)
+            
+            # Use optimization to find best camera position
+            camera_pos = estimate_camera_position(
+                *approx_distances,
+                initial_guess=prev_pos
+            )
+            
+            # Store for next frame's initial guess
+            prev_pos = camera_pos
+            
+            # Extract coordinates (left/right, up/down, forward/backward)
+            x, y, z = camera_pos
+            
+            print(f"Frame {frame_idx}: pos=({x:.2f}, {y:.2f}, {z:.2f})")
+            
+            coords_x.append(x)
+            coords_z.append(z)
+            
+        except Exception as e:
+            print(f"Error processing frame {frame_idx}: {e}")
+            if prev_pos is not None:
+                x, y, z = prev_pos
+                coords_x.append(x)
+                coords_z.append(z)
 
     # After the loop, plot the lines
     import matplotlib.pyplot as plt
@@ -322,5 +386,5 @@ if __name__ == '__main__':
     # Save the x and z coordinates to a text file
     with open("apex_xz.txt", "w") as f:
         for x, z in zip(coords_x, coords_z):
-            f.write(f"{x} {-z}\n")
+            f.write(f"{x} {z}\n")
 
