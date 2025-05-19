@@ -248,9 +248,9 @@ if __name__ == '__main__':
             ball_sizes.append(sizes)
 
             # DEBUG
-            if count > 10:
-                print("end after 10 frames")
-                break
+            # if count > 10:
+            #     print("end after 10 frames")
+            #     break
 
 
 
@@ -282,6 +282,7 @@ if __name__ == '__main__':
 
     print(ball_sizes)
 
+    coords_x, coords_z = [], []
     for red_size, green_size, blue_size in ball_sizes:
         # Calculate the distances
         red_distance = original_distance * (red_size / original_ball_sizes[RED])
@@ -293,5 +294,28 @@ if __name__ == '__main__':
         print(f"Blue distance: {blue_distance:.2f}")
 
         apex = apex_coordinates(red_distance, green_distance, blue_distance)
-        print(f"Apex coordinates: {apex}")  
+        print(f"Apex coordinates: {apex}")
+
+        # x (left/ right. larger is right), y (up/down, ignore for now), z (forward/backward. larger is back)
+        x, y, z = apex
+
+        print(x, z)
+
+        # Draw lines between the coordinates using matplotlib
+        import matplotlib.pyplot as plt
+
+        # Store the coordinates for plotting
+        coords_x.append(x)
+        coords_z.append(z)
+
+    # After the loop, plot the lines
+    import matplotlib.pyplot as plt
+
+    plt.figure()
+    plt.plot(coords_x, coords_z, marker='o', linestyle='-')
+    plt.xlabel('X')
+    plt.ylabel('Z')
+    plt.title('Apex Trajectory')
+    plt.grid(True)
+    plt.show()
 
