@@ -322,7 +322,7 @@ if __name__ == '__main__':
     # Estimate initial camera position (approximately 18 units away from center)
     initial_pos = np.array([4.5, -9, 18])
     
-    coords_x, coords_z = [], []
+    coords_x, coords_y, coords_z = [], [], []
     prev_pos = initial_pos  # Use previous position as initial guess for next frame
     
     for frame_idx, (red_size, green_size, blue_size) in enumerate(ball_sizes):
@@ -350,6 +350,7 @@ if __name__ == '__main__':
             # print(f"Frame {frame_idx}: pos=({x:.2f}, {y:.2f}, {z:.2f})")
             
             coords_x.append(x)
+            coords_y.append(y)
             coords_z.append(z)
             
         except Exception as e:
@@ -357,20 +358,36 @@ if __name__ == '__main__':
             if prev_pos is not None:
                 x, y, z = prev_pos
                 coords_x.append(x)
+                coords_y.append(y)
                 coords_z.append(z)
 
     # After the loop, plot the lines
     import matplotlib.pyplot as plt
 
-    plt.figure()
+    # Create a figure with two subplots side by side
+    plt.figure(figsize=(12, 5))
+    
+    # Plot top view (X-Z plane)
+    plt.subplot(1, 2, 1)
     plt.plot(coords_x, coords_z, marker='o', linestyle='-')
     plt.xlabel('X')
     plt.ylabel('Z')
-    plt.title('Apex Trajectory')
+    plt.title('Top View (X-Z)')
     plt.grid(True)
+    
+    # Plot camera height over time
+    plt.subplot(1, 2, 2)
+    frames = range(len(coords_y))
+    plt.plot(frames, coords_y, marker='o', linestyle='-')
+    plt.xlabel('Frame')
+    plt.ylabel('Y (height)')
+    plt.title('Camera Height')
+    plt.grid(True)
+    
+    plt.tight_layout()
     plt.show()
 
-    # Save the x and z coordinates to a text file
+    # Save the coordinates to a text file
     with open("apex_xz.txt", "w") as f:
         for x, z in zip(coords_x, coords_z):
             f.write(f"{x} {z}\n")
