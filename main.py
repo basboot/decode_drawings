@@ -11,6 +11,67 @@ def estimate_undistorted_radius(major, minor):
     r_undistorted = math.sqrt(a * b)  # geometric mean
     return r_undistorted
 
+
+
+def apex_coordinates(a, b, c, side_length=9):
+    """
+    Compute the 3D coordinates of the apex of a pyramid over an equilateral triangle base,
+    given distances from the apex to each corner.
+
+    Parameters:
+    a, b, c : float
+        Distances from apex to vertices A, B, and C respectively.
+    side_length : float
+        Length of the side of the equilateral triangle base.
+
+    Returns:
+    (x, y, z) : tuple of floats
+        Coordinates of the apex point.
+    """
+    # Coordinates of triangle vertices
+    A = np.array([side_length / 2, (side_length * np.sqrt(3)) / 2, 0.0]) # red
+    B = np.array([side_length, 0.0, 0.0]) # green
+    C = np.array([0.0, 0.0, 0.0]) # blue
+
+    # From distance equations:
+    # |P - A|^2 = a^2 = x^2 + y^2 + z^2
+    # |P - B|^2 = b^2 = (x - s)^2 + y^2 + z^2
+    # |P - C|^2 = c^2 = (x - s/2)^2 + (y - h)^2 + z^2
+    # where h = s * sqrt(3)/2
+
+    s = side_length
+    h = (s * np.sqrt(3)) / 2
+
+    # Use differences to eliminate z^2
+    # Equation 1: x^2 + y^2 + z^2 = a^2
+    # Equation 2: (x - s)^2 + y^2 + z^2 = b^2
+    # Equation 3: (x - s/2)^2 + (y - h)^2 + z^2 = c^2
+
+    # Subtract eq1 from eq2:
+    # (x - s)^2 - x^2 = b^2 - a^2
+    # => x^2 - 2sx + s^2 - x^2 = b^2 - a^2 => -2sx + s^2 = b^2 - a^2
+    # => x = (s^2 - (b^2 - a^2)) / (2s)
+
+    x = (s ** 2 - (b ** 2 - a ** 2)) / (2 * s)
+
+    # Subtract eq1 from eq3:
+    # (x - s/2)^2 + (y - h)^2 - x^2 - y^2 = c^2 - a^2
+    # Expand and simplify:
+    # (x^2 - sx + s^2/4) + (y^2 - 2yh + h^2) - x^2 - y^2 = c^2 - a^2
+    # => -sx + s^2/4 - 2yh + h^2 = c^2 - a^2
+    # => y = (s^2/4 + h^2 - (c^2 - a^2) - sx) / (2h)
+
+    y = (s ** 2 / 4 + h ** 2 - (c ** 2 - a ** 2) - s * x) / (2 * h)
+
+    # Now plug x and y into Equation 1 to get z
+    z_squared = a ** 2 - x ** 2 - y ** 2
+    if z_squared < 0:
+        raise ValueError("No real solution: apex is not reachable with given distances.")
+    z = np.sqrt(z_squared)
+
+    return (x, y, z)
+
+
 ball_sizes = []
 count = 0
 
@@ -23,11 +84,12 @@ if __name__ == '__main__':
     else:
         print("Video file opened successfully!")
 
+    original_ball_sizes = {}
     # Read the first frame to confirm reading
     while True:
         ret, frame = cap.read()
 
-        original_ball_sizes = {}
+
 
         if ret:
             # Display the frame using imshow
@@ -219,4 +281,17 @@ if __name__ == '__main__':
     print(f"Distance: {original_distance}")
 
     print(ball_sizes)
+
+    for red_size, green_size, blue_size in ball_sizes:
+        # Calculate the distances
+        red_distance = original_distance * (red_size / original_ball_sizes[RED])
+        green_distance = original_distance * (green_size / original_ball_sizes[GREEN])
+        blue_distance = original_distance * (blue_size / original_ball_sizes[BLUE])
+
+        print(f"Red distance: {red_distance:.2f}")
+        print(f"Green distance: {green_distance:.2f}")
+        print(f"Blue distance: {blue_distance:.2f}")
+
+        apex = apex_coordinates(red_distance, green_distance, blue_distance)
+        print(f"Apex coordinates: {apex}")  
 
