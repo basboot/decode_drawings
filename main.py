@@ -319,3 +319,8 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.show()
 
+    # Save the x and z coordinates to a text file
+    with open("apex_xz.txt", "w") as f:
+        for x, z in zip(coords_x, coords_z):
+            f.write(f"{x} {-z}\n")
+
