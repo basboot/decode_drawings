@@ -134,7 +134,7 @@ ball_sizes = []
 count = 0
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("videos/2.mp4")
+    cap = cv2.VideoCapture("videos/1.mp4")
 
     # Check if the video was opened successfully
     if not cap.isOpened():
@@ -205,28 +205,15 @@ if __name__ == '__main__':
             upper_blue = np.array([140, 255, 255])
 
             # Create masks
-            # TODO: do not combine, but perform 3 times
             mask_red = cv2.inRange(hsv, lower_red1, upper_red1) | cv2.inRange(hsv, lower_red2, upper_red2)
             mask_green = cv2.inRange(hsv, lower_green, upper_green)
             mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
 
-            # TODO: change name, since we do not combine anymore
             sizes = []
-            for combined_mask, color in [(mask_red, RED), (mask_green, GREEN), (mask_blue, BLUE)]:
-
-                # Combine all masks
-                # combined_mask = cv2.bitwise_or(cv2.bitwise_or(mask_red, mask_green), mask_blue)
-
-                # Optional: Clean up mask
-                # combined_mask = cv2.GaussianBlur(combined_mask, (5, 5), 0)
-                # erosion not needed after fremoving the blur
-                # combined_mask = cv2.erode(combined_mask, np.ones((3, 3), np.uint8), iterations=1)
-
-                # TODO: check if needed
-                # combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+            for color_mask, color in [(mask_red, RED), (mask_green, GREEN), (mask_blue, BLUE)]:
 
                 # Find contours on the clean mask
-                contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                contours, _ = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 # Draw contours
                 # output = frame.copy()
@@ -360,7 +347,7 @@ if __name__ == '__main__':
             # Extract coordinates (left/right, up/down, forward/backward)
             x, y, z = camera_pos
             
-            print(f"Frame {frame_idx}: pos=({x:.2f}, {y:.2f}, {z:.2f})")
+            # print(f"Frame {frame_idx}: pos=({x:.2f}, {y:.2f}, {z:.2f})")
             
             coords_x.append(x)
             coords_z.append(z)
