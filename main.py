@@ -5,7 +5,7 @@ import math
 from scipy.optimize import minimize
 
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
-TRIANGLE_CENTER = np.array([4.5, 4.5 * np.sqrt(3)/2, 0])  # Point camera is looking at
+TRIANGLE_CENTER = np.array([4.5, 18, 0])  # Point camera is looking at (height = 18)
 
 def estimate_undistorted_radius(major, minor):
     a = major / 2
@@ -47,11 +47,14 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     Estimate camera position using optimization.
     Takes into account that camera is always looking at triangle center.
     """
-    # Ball positions in world space
+    # Ball positions in world space (all at height 18)
+    # Equilateral triangle with center at (4.5, 18, 0), side length 9
+    # Height of triangle: h = 9 * sqrt(3) / 2 ≈ 7.794
+    h = 9 * np.sqrt(3) / 2
     ball_positions = [
-        np.array([4.5, 9*np.sqrt(3)/2, 0]),  # Red
-        np.array([9, 0, 0]),                  # Green
-        np.array([0, 0, 0])                   # Blue
+        np.array([4.5, 18 + h / 3, 0]),   # Red (top vertex)
+        np.array([9, 18 - h / 3, 0]),     # Green (bottom right)
+        np.array([0, 18 - h / 3, 0])      # Blue (bottom left)
     ]
     
     distances = [red_dist, green_dist, blue_dist]
@@ -59,7 +62,7 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     if initial_guess is None:
         # Make initial guess based on average distance
         avg_dist = sum(distances) / 3
-        initial_guess = [4.5, -avg_dist/2, avg_dist]
+        initial_guess = [4.5, 18, avg_dist]
     
     # Use optimization to find best camera position
     result = minimize(
@@ -320,7 +323,7 @@ if __name__ == '__main__':
     print("Number of frames:", len(ball_sizes))
 
     # Estimate initial camera position (approximately 18 units away from center)
-    initial_pos = np.array([4.5, -9, 18])
+    initial_pos = np.array([4.5, 18, 18])  # Same height as triangle center
     
     coords_x, coords_y, coords_z = [], [], []
     prev_pos = initial_pos  # Use previous position as initial guess for next frame
