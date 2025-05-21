@@ -252,6 +252,7 @@ if __name__ == '__main__':
     initial_pos = np.array([4.5, 18, 18])  # Same height as triangle center
     
     coords_x, coords_y, coords_z = [], [], []
+    green_blue_angles = [] # New list to store angles
     prev_pos = initial_pos  # Use previous position as initial guess for next frame
     
     for frame_idx, frame_ball_data in enumerate(ball_sizes):
@@ -265,12 +266,23 @@ if __name__ == '__main__':
                 coords_x.append(np.nan)
                 coords_y.append(np.nan)
                 coords_z.append(np.nan)
+            green_blue_angles.append(np.nan) # Add NaN for angle as well
             continue
 
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
 
+        # Calculate Green-Blue angle before checking if all balls are present for 3D estimation
+        if green_data and blue_data:
+            _, green_x, green_y, _ = green_data
+            _, blue_x, blue_y, _ = blue_data
+            angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
+            green_blue_angles.append(math.degrees(angle_rad))
+        else:
+            green_blue_angles.append(np.nan)
+
+        # Check if all balls were found for 3D position estimation
         if not (red_data and green_data and blue_data):
-            print(f"Skipping frame {frame_idx} due to missing ball data.")
+            print(f"Skipping frame {frame_idx} for 3D estimation due to missing ball data.")
             if prev_pos is not None:
                 coords_x.append(prev_pos[0])
                 coords_y.append(prev_pos[1])
@@ -279,6 +291,7 @@ if __name__ == '__main__':
                 coords_x.append(np.nan)
                 coords_y.append(np.nan)
                 coords_z.append(np.nan)
+            # Angle was already handled above, so just continue
             continue
 
         red_size, _, _, _ = red_data
@@ -307,6 +320,9 @@ if __name__ == '__main__':
                     coords_x.append(prev_pos[0]); coords_y.append(prev_pos[1]); coords_z.append(prev_pos[2])
                 else:
                     coords_x.append(np.nan); coords_y.append(np.nan); coords_z.append(np.nan)
+                # Angle is already handled if a ball required for it was missing, or if dist calc failed.
+                # If dist calc failed but G-B was present, angle is already in the list.
+                # No need to add another NaN for angle here specifically for dist calc failure.
                 continue
 
             camera_pos = estimate_camera_position(
@@ -321,32 +337,50 @@ if __name__ == '__main__':
             coords_x.append(x)
             coords_y.append(y)
             coords_z.append(z)
+            # Angle is handled at the start of the loop for this frame
             
         except Exception as e:
-            print(f"Error processing frame {frame_idx}: {e}")
+            print(f"Error processing frame {frame_idx} for 3D estimation: {e}")
             if prev_pos is not None:
                 x, y, z = prev_pos
                 coords_x.append(x)
                 coords_y.append(y)
                 coords_z.append(z)
+            else:
+                coords_x.append(np.nan)
+                coords_y.append(np.nan)
+                coords_z.append(np.nan)
+            # Angle was already added (or NaN) at the start of the loop iteration
 
     import matplotlib.pyplot as plt
 
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(18, 5)) # Adjusted figure size for 3 subplots
     
-    plt.subplot(1, 2, 1)
+    # Plot top view (X-Z plane)
+    plt.subplot(1, 3, 1) # Changed to 1, 3, 1
     plt.plot(coords_x, coords_z, marker='o', linestyle='-')
     plt.xlabel('X')
     plt.ylabel('Z')
     plt.title('Top View (X-Z)')
     plt.grid(True)
+    plt.axis('equal') # Added for better aspect ratio representation
     
-    plt.subplot(1, 2, 2)
-    frames = range(len(coords_y))
-    plt.plot(frames, coords_y, marker='o', linestyle='-')
+    # Plot camera height over time
+    plt.subplot(1, 3, 2) # Changed to 1, 3, 2
+    frames_y = range(len(coords_y))
+    plt.plot(frames_y, coords_y, marker='o', linestyle='-')
     plt.xlabel('Frame')
     plt.ylabel('Y (height)')
     plt.title('Camera Height')
+    plt.grid(True)
+
+    # New subplot for Green-Blue angle
+    plt.subplot(1, 3, 3) # New subplot
+    frames_angle = range(len(green_blue_angles))
+    plt.plot(frames_angle, green_blue_angles, marker='.', linestyle='-', color='purple')
+    plt.xlabel('Frame')
+    plt.ylabel('Green-Blue Angle (degrees)')
+    plt.title('Angle of Green-Blue Line')
     plt.grid(True)
     
     plt.tight_layout()
