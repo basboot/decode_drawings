@@ -352,6 +352,48 @@ if __name__ == '__main__':
                 coords_z.append(np.nan)
             # Angle was already added (or NaN) at the start of the loop iteration
 
+    # SLAM-like loop closure for X-Z coordinates
+    if len(coords_x) > 1 and len(coords_z) > 1:
+        # Check if start and end points are valid numbers before attempting closure
+        first_x_is_valid = not np.isnan(coords_x[0]) if coords_x else False
+        last_x_is_valid = not np.isnan(coords_x[-1]) if coords_x else False
+        first_z_is_valid = not np.isnan(coords_z[0]) if coords_z else False
+        last_z_is_valid = not np.isnan(coords_z[-1]) if coords_z else False
+
+        if first_x_is_valid and last_x_is_valid and first_z_is_valid and last_z_is_valid:
+            print("Applying SLAM-like loop closure to X-Z path...")
+            
+            x_start, z_start = coords_x[0], coords_z[0]
+            x_end, z_end = coords_x[-1], coords_z[-1]
+
+            delta_x = x_start - x_end
+            delta_z = z_start - z_end
+
+            num_points = len(coords_x)
+            
+            # Create copies to modify, ensuring they are lists of floats
+            # This also handles cases where original lists might contain mixed types if NaNs were introduced
+            adjusted_coords_x = [float(val) for val in coords_x]
+            adjusted_coords_z = [float(val) for val in coords_z]
+
+            for i in range(num_points):
+                # Only adjust if the current point is not NaN
+                if not np.isnan(adjusted_coords_x[i]) and not np.isnan(adjusted_coords_z[i]):
+                    adjustment_factor = i / (num_points - 1) if num_points > 1 else 0.0
+                    adjusted_coords_x[i] += delta_x * adjustment_factor
+                    adjusted_coords_z[i] += delta_z * adjustment_factor
+            
+            # Update coords_x and coords_z with adjusted values for plotting and saving
+            coords_x = adjusted_coords_x
+            coords_z = adjusted_coords_z
+            print(f"Loop closure applied. Original end: ({x_end:.2f}, {z_end:.2f}), New end: ({coords_x[-1]:.2f}, {coords_z[-1]:.2f})")
+        else:
+            print("Skipping loop closure due to NaN or missing start/end points in the path.")
+    elif coords_x and coords_z : # Check if lists are not empty
+        print("Not enough points (or only one point) to apply loop closure.")
+    else:
+        print("Path is empty, skipping loop closure.")
+
     import matplotlib.pyplot as plt
 
     plt.figure(figsize=(18, 5)) # Adjusted figure size for 3 subplots
