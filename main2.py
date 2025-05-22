@@ -2,7 +2,6 @@
 import cv2
 import numpy as np
 import math
-import math
 from scipy.optimize import minimize
 import json  # Added for saving data
 import os    # Added for checking file existence
@@ -44,7 +43,7 @@ def calculate_camera_error(pos, distances, ball_positions):
         dist_error = (dist - target_dist) ** 2
         
         error += dist_error + 5 * angle_error  # Weight angle error more
-    
+
     return error
 
 def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None):
@@ -57,7 +56,7 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     # Height of triangle: h = 9 * sqrt(3) / 2 ≈ 7.794
     h = 9 * np.sqrt(3) / 2
     ball_positions = [
-        np.array([4.5, 18 + h / 3, 0]),   # Red (top vertex)
+        np.array([4.5, 18 + (2 / 3) * h, 0]),   # Red (top vertex)
         np.array([9, 18 - h / 3, 0]),     # Green (bottom right)
         np.array([0, 18 - h / 3, 0])      # Blue (bottom left)
     ]
@@ -455,39 +454,80 @@ if __name__ == '__main__':
     else:
         print("Path is empty, skipping loop closure.")
 
+    # Convert lists to numpy arrays for easier manipulation in plotting
+    coords_x = np.array(coords_x)
+    coords_y = np.array(coords_y)
+    coords_z = np.array(coords_z)
+    green_blue_angles = np.array(green_blue_angles)
+
     import matplotlib.pyplot as plt
+    import matplotlib.cm as cm # Added for colormap
 
-    plt.figure(figsize=(18, 5)) # Adjusted figure size for 3 subplots
-    
-    # Plot top view (X-Z plane)
-    plt.subplot(1, 3, 1) # Changed to 1, 3, 1
-    plt.plot(coords_x, coords_z, marker='o', linestyle='-')
-    plt.xlabel('X')
-    plt.ylabel('Z')
-    plt.title('Top View (X-Z)')
-    plt.grid(True)
-    plt.axis('equal') # Added for better aspect ratio representation
-    
-    # Plot camera height over time
-    plt.subplot(1, 3, 2) # Changed to 1, 3, 2
-    frames_y = range(len(coords_y))
-    plt.plot(frames_y, coords_y, marker='o', linestyle='-')
-    plt.xlabel('Frame')
-    plt.ylabel('Y (height)')
-    plt.title('Camera Height')
-    plt.grid(True)
+    if len(coords_x) == 0:
+        print("No data to plot.")
+    else:
+        plt.figure(figsize=(20, 6)) # Adjusted figure size for clarity
+        
+        num_frames = len(coords_x)
+        color_indices = np.arange(num_frames)
+        cmap = plt.cm.get_cmap('inferno') # You can choose other colormaps like 'plasma', 'inferno', 'magma', 'cividis'
+        
+        # Normalization factor for cmap, handles num_frames=1 case
+        norm_factor = (num_frames - 1.0) if num_frames > 1 else 1.0
 
-    # New subplot for Green-Blue angle
-    plt.subplot(1, 3, 3) # New subplot
-    frames_angle = range(len(green_blue_angles))
-    plt.plot(frames_angle, green_blue_angles, marker='.', linestyle='-', color='purple')
-    plt.xlabel('Frame')
-    plt.ylabel('Green-Blue Angle (degrees)')
-    plt.title('Angle of Green-Blue Line')
-    plt.grid(True)
-    
-    plt.tight_layout()
-    plt.show()
+        # Plot top view (X-Z plane)
+        ax1 = plt.subplot(1, 3, 1)
+        if num_frames > 1:
+            for i in range(num_frames - 1):
+                if not (np.isnan(coords_x[i]) or np.isnan(coords_z[i]) or np.isnan(coords_x[i+1]) or np.isnan(coords_z[i+1])):
+                    ax1.plot([coords_x[i], coords_x[i+1]], [coords_z[i], coords_z[i+1]], color=cmap(color_indices[i] / norm_factor), linestyle='-')
+        valid_indices_xz = ~(np.isnan(coords_x) | np.isnan(coords_z))
+        if np.any(valid_indices_xz):
+             ax1.scatter(coords_x[valid_indices_xz], coords_z[valid_indices_xz], c=color_indices[valid_indices_xz], cmap=cmap, marker='o', s=25, zorder=2, linewidth=0)
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Z')
+        ax1.set_title('Top View (X-Z)')
+        ax1.grid(True)
+        ax1.axis('equal')
+        
+        # Plot camera height over time
+        ax2 = plt.subplot(1, 3, 2)
+        frames_indices = np.arange(num_frames)
+        if num_frames > 1:
+            for i in range(num_frames - 1):
+                if not (np.isnan(coords_y[i]) or np.isnan(coords_y[i+1])):
+                    ax2.plot([frames_indices[i], frames_indices[i+1]], [coords_y[i], coords_y[i+1]], color=cmap(color_indices[i] / norm_factor), linestyle='-')
+        valid_indices_y = ~np.isnan(coords_y)
+        if np.any(valid_indices_y):
+            ax2.scatter(frames_indices[valid_indices_y], coords_y[valid_indices_y], c=color_indices[valid_indices_y], cmap=cmap, marker='o', s=25, zorder=2, linewidth=0)
+        ax2.set_xlabel('Frame')
+        ax2.set_ylabel('Y (height)')
+        ax2.set_title('Camera Height')
+        ax2.grid(True)
+
+        # New subplot for Green-Blue angle
+        ax3 = plt.subplot(1, 3, 3)
+        # Normalize green_blue_angles to be in [0, 360) range, preserving NaNs
+        angles_to_plot = np.full_like(green_blue_angles, np.nan, dtype=float)
+        valid_angle_mask = ~np.isnan(green_blue_angles)
+        angles_to_plot[valid_angle_mask] = np.where(green_blue_angles[valid_angle_mask] < 0, green_blue_angles[valid_angle_mask] + 360, green_blue_angles[valid_angle_mask])
+
+        if num_frames > 1:
+            for i in range(num_frames - 1):
+                if not (np.isnan(angles_to_plot[i]) or np.isnan(angles_to_plot[i+1])):
+                    ax3.plot([frames_indices[i], frames_indices[i+1]], [angles_to_plot[i], angles_to_plot[i+1]], color=cmap(color_indices[i] / norm_factor), linestyle='-')
+        valid_indices_angle = ~np.isnan(angles_to_plot)
+        if np.any(valid_indices_angle):
+            ax3.scatter(frames_indices[valid_indices_angle], angles_to_plot[valid_indices_angle], c=color_indices[valid_indices_angle], cmap=cmap, marker='.', s=30, zorder=2, linewidth=0)
+        ax3.set_xlabel('Frame')
+        ax3.set_ylabel('Green-Blue Angle (degrees)')
+        ax3.set_title('Angle of Green-Blue Line')
+        ax3.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(f"decode{VIDEO}.pdf", format="pdf", bbox_inches="tight")
+
+        plt.show()
 
     with open("apex_xz.txt", "w") as f:
         for x, z in zip(coords_x, coords_z):
