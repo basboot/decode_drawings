@@ -11,6 +11,7 @@ VIDEO = "1"
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
 TRIANGLE_CENTER = np.array([4.5, 18, 0])  # Point camera is looking at (height = 18)
 
+# Not used anymore, we just take the major axis
 def estimate_undistorted_radius(major, minor):
     a = major / 2
     b = minor / 2
@@ -78,6 +79,7 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     
     return result.x
 
+# Not used anymore
 def apex_coordinates(a, b, c, side_length=9):
     """
     Compute the 3D coordinates of the apex of a pyramid over an equilateral triangle base,
@@ -461,22 +463,21 @@ if __name__ == '__main__':
     green_blue_angles = np.array(green_blue_angles)
 
     import matplotlib.pyplot as plt
-    import matplotlib.cm as cm # Added for colormap
 
     if len(coords_x) == 0:
         print("No data to plot.")
     else:
-        plt.figure(figsize=(20, 6)) # Adjusted figure size for clarity
+        plt.figure(figsize=(15, 10)) # Adjusted figure size for 2x2 layout
         
         num_frames = len(coords_x)
         color_indices = np.arange(num_frames)
-        cmap = plt.cm.get_cmap('inferno') # You can choose other colormaps like 'plasma', 'inferno', 'magma', 'cividis'
-        
+        cmap = plt.colormaps.get_cmap('inferno')
+
         # Normalization factor for cmap, handles num_frames=1 case
         norm_factor = (num_frames - 1.0) if num_frames > 1 else 1.0
 
         # Plot top view (X-Z plane)
-        ax1 = plt.subplot(1, 3, 1)
+        ax1 = plt.subplot(2, 2, 1) # Changed to 2x2 layout
         if num_frames > 1:
             for i in range(num_frames - 1):
                 if not (np.isnan(coords_x[i]) or np.isnan(coords_z[i]) or np.isnan(coords_x[i+1]) or np.isnan(coords_z[i+1])):
@@ -491,7 +492,7 @@ if __name__ == '__main__':
         ax1.axis('equal')
         
         # Plot camera height over time
-        ax2 = plt.subplot(1, 3, 2)
+        ax2 = plt.subplot(2, 2, 2) # Changed to 2x2 layout
         frames_indices = np.arange(num_frames)
         if num_frames > 1:
             for i in range(num_frames - 1):
@@ -506,11 +507,12 @@ if __name__ == '__main__':
         ax2.grid(True)
 
         # New subplot for Green-Blue angle
-        ax3 = plt.subplot(1, 3, 3)
+        ax3 = plt.subplot(2, 2, 3) # Changed to 2x2 layout
         # Normalize green_blue_angles to be in [0, 360) range, preserving NaNs
         angles_to_plot = np.full_like(green_blue_angles, np.nan, dtype=float)
         valid_angle_mask = ~np.isnan(green_blue_angles)
         angles_to_plot[valid_angle_mask] = np.where(green_blue_angles[valid_angle_mask] < 0, green_blue_angles[valid_angle_mask] + 360, green_blue_angles[valid_angle_mask])
+        angles_to_plot[valid_angle_mask] -= 180
 
         if num_frames > 1:
             for i in range(num_frames - 1):
@@ -524,10 +526,29 @@ if __name__ == '__main__':
         ax3.set_title('Angle of Green-Blue Line')
         ax3.grid(True)
         
+        # 4th Plot: Pole Bottom Displacement
+        ax4 = plt.subplot(2, 2, 4) # New subplot
+        pole_length = 18  # cm
+        pole_displacement = pole_length * np.deg2rad(angles_to_plot)
+
+        if num_frames > 1:
+            for i in range(num_frames - 1):
+                if not (np.isnan(pole_displacement[i]) or np.isnan(pole_displacement[i+1])):
+                    ax4.plot([frames_indices[i], frames_indices[i+1]], [pole_displacement[i], pole_displacement[i+1]], color=cmap(color_indices[i] / norm_factor), linestyle='-')
+        
+        valid_indices_displacement = ~np.isnan(pole_displacement)
+        if np.any(valid_indices_displacement):
+            ax4.scatter(frames_indices[valid_indices_displacement], pole_displacement[valid_indices_displacement], c=color_indices[valid_indices_displacement], cmap=cmap, marker='.', s=30, zorder=2, linewidth=0)
+        
+        ax4.set_xlabel('Frame')
+        ax4.set_ylabel('Pole Bottom Displacement (cm)')
+        ax4.set_title('Pole Displacement (18cm pole)')
+        ax4.grid(True)
+
         plt.tight_layout()
         plt.savefig(f"decode{VIDEO}.pdf", format="pdf", bbox_inches="tight")
 
-        plt.show()
+        # plt.show()
 
     with open("apex_xz.txt", "w") as f:
         for x, z in zip(coords_x, coords_z):
