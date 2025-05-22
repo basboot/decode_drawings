@@ -11,7 +11,8 @@ if __name__ == '__main__':
     VIDEO = "1"
     ball_sizes = get_video_data(VIDEO)
 
-    coords_x, coords_y, coords_z, green_blue_angles = calculate_camera_positions(ball_sizes)
+    coords_x, coords_y, coords_z = calculate_camera_positions(ball_sizes)
+    green_blue_angles, triangle_center_x, triangle_center_y = calculate_triangle(ball_sizes)
 
 
     coords_x, coords_y, coords_z = smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average',
@@ -57,10 +58,10 @@ if __name__ == '__main__':
             "marker": '.', "marker_size": 30
         },
         {
-            "x_data": frames_indices, "y_data": pole_displacement,
-            "xlabel": 'Frame', "ylabel": 'Pole Bottom Displacement (cm)', "title": 'Pole Displacement (18cm pole)',
+            "x_data": frames_indices, "y_data": coords_x,
+            "xlabel": 'Frame', "ylabel": 'x', "title": 'X',
             "marker": '.', "marker_size": 30
-        }
+        },
     ]
 
     # plot data

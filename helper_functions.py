@@ -272,17 +272,10 @@ def calculate_camera_positions(ball_sizes):
     original_ball_sizes_blue = ball_sizes[0][2][2]
 
     coords_x, coords_y, coords_z = [], [], []
-    green_blue_angles = []  # New list to store angles
     prev_pos = INITIAL_CAMERA_POSITION  # Use previous position as initial guess for next frame
 
     for frame_idx, frame_ball_data in enumerate(ball_sizes):
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
-
-        # Calculate Green-Blue angle
-        green_x, green_y, _, _, _ = green_data
-        blue_x, blue_y, _, _, _ = blue_data
-        angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
-        green_blue_angles.append(math.degrees(angle_rad))
 
         _, _, red_size, _, _= red_data
         _, _, green_size, _, _ = green_data
@@ -323,4 +316,30 @@ def calculate_camera_positions(ball_sizes):
             coords_x.append(x)
             coords_y.append(y)
             coords_z.append(z)
-    return coords_x, coords_y, coords_z, green_blue_angles
+    return coords_x, coords_y, coords_z
+
+
+def calculate_triangle(ball_sizes):
+    green_blue_angles = []  # New list to store angles
+    triangle_center_x, triangle_center_y = [], []
+
+    for frame_idx, frame_ball_data in enumerate(ball_sizes):
+        red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
+
+        # Calculate Green-Blue angle
+        green_x, green_y, _, _, _ = green_data
+        blue_x, blue_y, _, _, _ = blue_data
+        red_x, red_y, _, _, _ = red_data
+
+        angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
+        green_blue_angles.append(math.degrees(angle_rad))
+
+        # Calculate average x and y from red, green, and blue
+        avg_x = (red_x + green_x + blue_x) / 3
+        avg_y = (red_y + green_y + blue_y) / 3
+
+        triangle_center_x.append(avg_x)
+        triangle_center_y.append(avg_y)
+
+    return green_blue_angles, triangle_center_x, triangle_center_y
+
