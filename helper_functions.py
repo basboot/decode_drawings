@@ -320,7 +320,12 @@ def calculate_camera_positions(ball_sizes):
 
 
 def calculate_triangle(ball_sizes):
+    original_green_x = ball_sizes[0][1][0]
+    original_blue_x = ball_sizes[0][2][0]
+    original_dist_green_blue = abs(original_green_x - original_blue_x)
+
     green_blue_angles = []  # New list to store angles
+    green_blue_distances = []
     triangle_center_x, triangle_center_y = [], []
 
     for frame_idx, frame_ball_data in enumerate(ball_sizes):
@@ -334,6 +339,9 @@ def calculate_triangle(ball_sizes):
         angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
         green_blue_angles.append(math.degrees(angle_rad))
 
+        new_distance = abs(green_x - blue_x)
+        green_blue_distances.append(new_distance / original_dist_green_blue * TRIANGLE_SIZE)
+
         # Calculate average x and y from red, green, and blue
         avg_x = (red_x + green_x + blue_x) / 3
         avg_y = (red_y + green_y + blue_y) / 3
@@ -341,5 +349,5 @@ def calculate_triangle(ball_sizes):
         triangle_center_x.append(avg_x)
         triangle_center_y.append(avg_y)
 
-    return green_blue_angles, triangle_center_x, triangle_center_y
+    return green_blue_angles, green_blue_distances, triangle_center_x, triangle_center_y
 
