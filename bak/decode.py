@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+import matplotlib.pyplot as plt
 
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
 TRIANGLE_CENTER = np.array([4.5, 18, 0])
@@ -29,8 +30,20 @@ def process_contour(frame, mask):
     
     major_axis = max(raw_axis_1, raw_axis_2)
     minor_axis = min(raw_axis_1, raw_axis_2)
+
+    
     
     estimated_radius = estimate_undistorted_radius(major_axis, minor_axis)
+
+    # TODO: cleanup
+    # Determine the orientation of the actual major axis
+    if raw_axis_1 >= raw_axis_2:  # raw_axis_1 is major
+        actual_major_axis_orientation = angle
+    else:  # raw_axis_2 is major, raw_axis_1 is minor
+        actual_major_axis_orientation = angle % 180.0
+        # Ensure angle is in [0, 180) if OpenCV's angle can sometimes make this go out of range
+        if actual_major_axis_orientation < 0:
+            actual_major_axis_orientation += 180.0
 
     if DEBUG:
         output = frame.copy()
@@ -57,13 +70,14 @@ def process_contour(frame, mask):
         'major_axis': float(major_axis),
         'minor_axis': float(minor_axis),
         'angle': float(angle),
+        'major_axis_orientation': float(actual_major_axis_orientation),
         'estimated_radius': float(estimated_radius)
     }
 
     
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("videos/1.mp4")
+    cap = cv2.VideoCapture("../videos/1.mp4")
     if not cap.isOpened():
         print("Error: Could not open video file.")
         exit()
@@ -98,4 +112,22 @@ if __name__ == '__main__':
     cap.release()
     print("Frame info:", frame_info)
     print("Number of frames processed:", len(frame_info))
+
+    # --- Scatter plot of angles ---
+    all_angles = []
+    for frame_data in frame_info:
+        for color_key in [RED, GREEN, BLUE]:
+            if color_key in frame_data and 'major_axis_orientation' in frame_data[color_key]:
+                all_angles.append(frame_data[color_key]['angle'])
+
+    if all_angles:
+        plt.figure(figsize=(10, 6))
+        plt.scatter(range(len(all_angles)), all_angles, alpha=0.6, s=10) # s is marker size
+        plt.title('Scatter Plot of Detected Ellipse Angles')
+        plt.xlabel('Detection Instance')
+        plt.ylabel('Angle (degrees)')
+        plt.grid(True)
+        plt.show()
+    else:
+        print("No angle data found to plot.")
 

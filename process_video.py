@@ -1,0 +1,130 @@
+# https://radufromfinland.com/decodeTheDrawings/
+import cv2
+import numpy as np
+import math
+import json  # Added for saving data
+import os  # Added for checking file existence
+
+from global_settings import *
+from helper_functions import *
+
+
+# processes the given video (only use the number of the video 1-6) and returns original_ball_sizes, ball_sizes
+# also saves the data to disc, and tries to reuse unless use_cache = False
+def get_video_data(video, use_cache = True):
+    ball_sizes = []
+
+    ball_data_filepath = f"data/ball_sizes_data{video}.json"
+
+    data_loaded_successfully = False
+    if use_cache and os.path.exists(ball_data_filepath):
+        print(f"Found data file: {ball_data_filepath}. Attempting to load...")
+        try:
+            with open(ball_data_filepath, "r") as f:
+                loaded_data = json.load(f)
+            ball_sizes = loaded_data['ball_data']
+            print("Ball data loaded successfully from file.")
+            data_loaded_successfully = True
+        except Exception as e:
+            print(f"Error loading data from {ball_data_filepath}: {e}. Will process video instead.")
+            ball_sizes = []
+
+    if not data_loaded_successfully:
+        print("Processing video to gather ball data...")
+        cap = cv2.VideoCapture(f"videos/{video}.mp4")
+
+        frame_width = None
+        frame_height = None
+        total_frames_in_video = None
+
+        if not cap.isOpened():
+            print("Error: Could not open video file.")
+            exit()  # Exit if video cannot be opened and no data loaded
+        else:
+            print("Video file opened successfully!")
+            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            total_frames_in_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        count = 0
+        ball_sizes = []  # Ensure it's empty
+
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("End of video or error reading frame.")
+                break
+
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            lower_red1 = np.array([0, 100, 100])
+            upper_red1 = np.array([10, 255, 255])
+            lower_red2 = np.array([160, 100, 100])
+            upper_red2 = np.array([179, 255, 255])
+            lower_green = np.array([40, 70, 70])
+            upper_green = np.array([80, 255, 255])
+            lower_blue = np.array([100, 150, 0])
+            upper_blue = np.array([140, 255, 255])
+
+            mask_red = cv2.inRange(hsv, lower_red1, upper_red1) | cv2.inRange(hsv, lower_red2, upper_red2)
+            mask_green = cv2.inRange(hsv, lower_green, upper_green)
+            mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+
+            current_frame_data = []  # Stores [R_data, G_data, B_data] for this frame
+            output = frame.copy()
+
+            for color_mask, color_name in [(mask_red, RED), (mask_green, GREEN), (mask_blue, BLUE)]:
+                contours, _ = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                ball_found_for_color = False
+                for cnt in contours:
+                    if len(cnt) >= 5:
+                        ellipse = cv2.fitEllipse(cnt)
+                        cv2.ellipse(output, ellipse, (0, 255, 0), 2)
+                        (x_ellipse, y_ellipse), (major, minor), angle_ellipse = ellipse
+
+                        ball_data = [x_ellipse, y_ellipse, major, minor, angle_ellipse]
+                        current_frame_data.append(ball_data)
+
+                        ball_found_for_color = True
+                        break  # Take first good contour for this color
+
+                if not ball_found_for_color:
+                    assert count > 0, f"Problem reading first frame, cannot find color {color_name}."
+                    print(f"WARNING: problem reading frame {count}, cannot find color {color_name}.")
+
+            if len(current_frame_data) == 3:
+                ball_sizes.append(current_frame_data)
+            else:
+                assert count > 0, f"Problem reading first frame, found {len(current_frame_data)} contours. Cannot continue."
+                print(f"WARNING: problem reading frame {count}, found {len(current_frame_data)} contours. Using previous frame as work around.")
+                prev_ball_sizes = ball_sizes[-1]
+                ball_sizes.append(prev_ball_sizes)
+
+            count += 1
+
+        cap.release()
+
+        print("Video processing complete.")
+        print("Number of frames processed:", len(ball_sizes))
+
+        video_info_property = {
+            "name": str(video),
+            "frames": total_frames_in_video,
+            "width": frame_width,
+            "height": frame_height
+        }
+        data_to_save = {
+            'video': video_info_property,
+            'ball_data': ball_sizes
+        }
+        try:
+            with open(ball_data_filepath, "w") as f:
+                json.dump(data_to_save, f, indent=4)
+            print(f"Successfully saved ball data to {ball_data_filepath}")
+        except Exception as e:
+            print(f"Error saving ball data: {e}")
+
+    if not ball_sizes:
+        print("Error: Ball data is not available after attempting load/processing. Exiting.")
+        exit()
+
+    return ball_sizes

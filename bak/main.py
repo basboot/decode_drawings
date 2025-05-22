@@ -2,6 +2,7 @@
 import cv2
 import numpy as np
 import math
+import math
 from scipy.optimize import minimize
 
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
@@ -137,7 +138,7 @@ ball_sizes = []
 count = 0
 
 if __name__ == '__main__':
-    cap = cv2.VideoCapture("videos/1.mp4")
+    cap = cv2.VideoCapture("../videos/1.mp4")
 
     # Check if the video was opened successfully
     if not cap.isOpened():
@@ -391,7 +392,7 @@ if __name__ == '__main__':
     plt.show()
 
     # Save the coordinates to a text file
-    with open("apex_xz.txt", "w") as f:
+    with open("../apex_xz.txt", "w") as f:
         for x, z in zip(coords_x, coords_z):
             f.write(f"{x} {z}\n")
 
