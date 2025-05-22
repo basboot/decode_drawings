@@ -7,6 +7,8 @@ from scipy.optimize import minimize
 import json  # Added for saving data
 import os    # Added for checking file existence
 
+VIDEO = "1"
+
 RED, GREEN, BLUE = "RED", "GREEN", "BLUE"
 TRIANGLE_CENTER = np.array([4.5, 18, 0])  # Point camera is looking at (height = 18)
 
@@ -135,12 +137,69 @@ def apex_coordinates(a, b, c, side_length=9):
 
     return (x, y, z)
 
+def apply_moving_average(data, window_size):
+    """
+    Applies a moving average filter to a list of numbers.
+    Handles np.nan values by ignoring them in the window calculation.
+    """
+    if not data:
+        return []
+    
+    # Ensure window_size is odd for a centered window
+    if window_size % 2 == 0:
+        window_size += 1
+        
+    half_window = window_size // 2
+    smoothed_data = []
+    
+    for i in range(len(data)):
+        window_start = max(0, i - half_window)
+        window_end = min(len(data), i + half_window + 1)
+        
+        current_window = data[window_start:window_end]
+        
+        # Filter out NaNs
+        valid_values_in_window = [x for x in current_window if not np.isnan(x)]
+        
+        if not valid_values_in_window:
+            smoothed_data.append(np.nan)
+        else:
+            smoothed_data.append(np.mean(valid_values_in_window))
+            
+    return smoothed_data
+
+def smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average', window_size=5):
+    """
+    Applies a specified smoothing method to the trajectory data.
+    """
+    if not coords_x or not coords_y or not coords_z:
+        print("Coordinate data is empty, skipping smoothing.")
+        return coords_x, coords_y, coords_z
+
+    if method == 'moving_average':
+        if len(coords_x) > window_size: # Apply only if enough data points
+            print(f"Applying moving average filter with window size {window_size}...")
+            smoothed_x = apply_moving_average(coords_x, window_size)
+            smoothed_y = apply_moving_average(coords_y, window_size)
+            smoothed_z = apply_moving_average(coords_z, window_size)
+            # Optionally, you might want to smooth other related data here too
+            # e.g., green_blue_angles if passed in and handled
+            return smoothed_x, smoothed_y, smoothed_z
+        else:
+            print("Not enough data points to apply moving average filter, or filter disabled.")
+            return coords_x, coords_y, coords_z
+    elif method == 'none' or method is None:
+        print("No smoothing method applied.")
+        return coords_x, coords_y, coords_z
+    else:
+        print(f"Unknown smoothing method: {method}. Returning original data.")
+        return coords_x, coords_y, coords_z
 
 ball_sizes = []
 count = 0 # This count is for video processing; will be 0 if loading from file initially.
 
 if __name__ == '__main__':
-    ball_data_filepath = "ball_sizes_data.json"
+    ball_data_filepath = f"ball_sizes_data{VIDEO}.json"
     original_ball_sizes = {} # Initialize
 
     data_loaded_successfully = False
@@ -160,7 +219,7 @@ if __name__ == '__main__':
 
     if not data_loaded_successfully:
         print("Processing video to gather ball data...")
-        cap = cv2.VideoCapture("videos/1.mp4")
+        cap = cv2.VideoCapture(f"videos/{VIDEO}.mp4")
 
         if not cap.isOpened():
             print("Error: Could not open video file.")
@@ -351,6 +410,8 @@ if __name__ == '__main__':
                 coords_y.append(np.nan)
                 coords_z.append(np.nan)
             # Angle was already added (or NaN) at the start of the loop iteration
+
+    coords_x, coords_y, coords_z = smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average', window_size=5)
 
     # SLAM-like loop closure for X-Z coordinates
     if len(coords_x) > 1 and len(coords_z) > 1:
