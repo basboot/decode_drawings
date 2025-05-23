@@ -265,7 +265,7 @@ def slam_like_loop_closure(coords_x, coords_z):
     return coords_x, coords_z
 
 
-def calculate_camera_positions(ball_sizes):
+def calculate_camera_positions_from_rgb_distances(ball_sizes):
     # major axes are the sizes (for now)
     original_ball_sizes_red = ball_sizes[0][0][2]
     original_ball_sizes_green = ball_sizes[0][1][2]

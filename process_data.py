@@ -11,7 +11,7 @@ if __name__ == '__main__':
     VIDEO = "1"
     ball_sizes = get_video_data(VIDEO)
 
-    coords_x, coords_y, coords_z = calculate_camera_positions(ball_sizes)
+    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_distances(ball_sizes)
     green_blue_angles, green_blue_distances, triangle_center_x, triangle_center_y = calculate_triangle(ball_sizes)
 
 
