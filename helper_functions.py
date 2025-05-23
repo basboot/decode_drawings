@@ -351,3 +351,86 @@ def calculate_triangle(ball_sizes):
 
     return green_blue_angles, green_blue_distances, triangle_center_x, triangle_center_y
 
+
+# bit overcomplicated, but could be useful later on
+def calculate_slope_of_horizontal_line_in_image(
+    p1_world: np.ndarray,
+    p2_world: np.ndarray,
+    camera_position_world: np.ndarray,
+    camera_yaw_degrees: float,
+    camera_pitch_degrees: float,
+    camera_roll_degrees: float,
+    intrinsics: dict
+) -> float:
+    """
+    Calculates the apparent slope of a 3D horizontal line when projected into a camera image.
+
+    A horizontal line is defined as a line where the Y-coordinate is constant in world space.
+    The camera coordinate system is assumed to be X right, Y down, Z forward.
+    The world coordinate system is assumed to have Y as the 'up' axis.
+
+    Parameters:
+    - p1_world (np.ndarray): (3,) XYZ coordinates of the first point of the line in world space.
+    - p2_world (np.ndarray): (3,) XYZ coordinates of the second point of the line in world space.
+    - camera_position_world (np.ndarray): (3,) XYZ position of the camera in world space.
+    - camera_yaw_degrees (float): Camera yaw. Rotation around the camera's initial Y-axis (degrees).
+    - camera_pitch_degrees (float): Camera pitch. Rotation around the camera's new X-axis (degrees).
+    - camera_roll_degrees (float): Camera roll. Rotation around the camera's newest Z-axis (degrees).
+                                   This uses an intrinsic 'yxz' Euler sequence.
+    - intrinsics (dict): Camera intrinsic parameters {'fx': float, 'fy': float, 'cx': float, 'cy': float}.
+
+    Returns:
+    - float: The slope (dy/dx) of the line in the 2D image plane.
+             Returns np.inf for vertical lines, np.nan if projection fails (e.g. points behind camera).
+    """
+    from scipy.spatial.transform import Rotation
+
+    # Validate that the line is horizontal (constant Y world coordinate)
+    if not np.isclose(p1_world[1], p2_world[1]):
+        raise ValueError("The provided 3D line is not horizontal (Y-coordinates of points differ in world space).")
+
+    # Create rotation matrix representing camera orientation in the world (R_cw)
+    # Euler sequence 'yxz':
+    # 1. Yaw around initial Y axis
+    # 2. Pitch around new X axis
+    # 3. Roll around newest Z axis
+    rot = Rotation.from_euler('yxz', [camera_yaw_degrees, camera_pitch_degrees, camera_roll_degrees], degrees=True)
+    R_cw = rot.as_matrix()  # Orientation of camera frame in world frame
+
+    # Rotation matrix from world to camera frame
+    R_wc = R_cw.T
+
+    # Transform points from world to camera coordinates
+    p1_cam = R_wc @ (p1_world - camera_position_world)
+    p2_cam = R_wc @ (p2_world - camera_position_world)
+
+    # Check if points are at or behind the camera's image plane (z_cam <= epsilon)
+    # Using a small epsilon to avoid division by zero and issues with points exactly on the plane
+    epsilon = 1e-6
+    if p1_cam[2] <= epsilon or p2_cam[2] <= epsilon:
+        return np.nan  # Points are not in front of the camera
+
+    # Project points to image plane
+    fx, fy = intrinsics['fx'], intrinsics['fy']
+    cx, cy = intrinsics['cx'], intrinsics['cy']
+
+    u1 = fx * p1_cam[0] / p1_cam[2] + cx
+    v1 = fy * p1_cam[1] / p1_cam[2] + cy
+
+    u2 = fx * p2_cam[0] / p2_cam[2] + cx
+    v2 = fy * p2_cam[1] / p2_cam[2] + cy
+
+    # Calculate slope in image plane (delta_v / delta_u)
+    delta_u = u2 - u1
+    delta_v = v2 - v1
+
+    if np.isclose(delta_u, 0.0):
+        if np.isclose(delta_v, 0.0):
+            # Points project to the same location.
+            # Slope could be considered 0 or undefined. Let's return 0 for simplicity.
+            return 0.0
+        return np.inf  # Vertical line in image
+    
+    slope = delta_v / delta_u
+    return slope
+
