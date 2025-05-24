@@ -85,7 +85,9 @@ function animate() {
     camera.position.x = circleCenter.x + Math.sin(cameraAngle) * cameraRadius;
     camera.position.y = circleCenter.y;
     camera.position.z = circleCenter.z + Math.cos(cameraAngle) * cameraRadius;
-    camera.lookAt(0, centerHeight, 0);
+    // camera.lookAt(0, centerHeight, 0);
+    camera.lookAt(Math.sin(cameraAngle * 10), centerHeight, 0);
+
 
     renderer.render(scene, camera);
 
