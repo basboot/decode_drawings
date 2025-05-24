@@ -2,6 +2,8 @@ import math
 
 import numpy as np
 from scipy.optimize import minimize
+from scipy.signal import butter,filtfilt
+
 
 from global_settings import *
 
@@ -16,7 +18,7 @@ def estimate_undistorted_radius(major, minor):
     return r_undistorted
 
 # calculate error for camera position, based in distances to ball and ball positions for optimization
-def calculate_camera_error(pos, distances, ball_positions, center=TRIANGLE_CENTER):
+def calculate_camera_error(pos, distances, ball_positions, center):
     """
     Calculate error between expected distances and actual distances,
     taking into account that camera is looking at triangle center.
@@ -47,15 +49,12 @@ def calculate_camera_error(pos, distances, ball_positions, center=TRIANGLE_CENTE
 
 
 # estimate camera position, using calculate_camera_error
-def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None):
+def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None, center=TRIANGLE_CENTER):
     """
     Estimate camera position using optimization.
     Takes into account that camera is always looking at triangle center.
     """
-    # Ball positions in world space (all at height 18)
-    # Equilateral triangle with center at (4.5, 18, 0), side length 9
-    # Height of triangle: h = 9 * sqrt(3) / 2 ≈ 7.794
-    h = TRIANGLE_SIZE * np.sqrt(3) / 2
+
     ball_positions = [RED_POSITION, GREEN_POSITION, BLUE_POSITION]
 
     distances = [red_dist, green_dist, blue_dist]
@@ -63,13 +62,13 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     if initial_guess is None:
         # Make initial guess based on average distance
         avg_dist = sum(distances) / 3
-        initial_guess = [TRIANGLE_CENTER, POLE_SIZE, avg_dist]
+        initial_guess = [CENTER_X, POLE_SIZE, avg_dist]
 
     # Use optimization to find best camera position
     result = minimize(
         calculate_camera_error,
         initial_guess,
-        args=(distances, ball_positions),
+        args=(distances, ball_positions, TRIANGLE_CENTER),
         method='Nelder-Mead'
     )
 
@@ -265,16 +264,16 @@ def slam_like_loop_closure(coords_x, coords_z):
     return coords_x, coords_z
 
 
-def calculate_camera_positions_from_rgb_distances(ball_sizes):
+def calculate_camera_positions_from_rgb_major_axis(ball_information, center=None):
     # major axes are the sizes (for now)
-    original_ball_sizes_red = ball_sizes[0][0][2]
-    original_ball_sizes_green = ball_sizes[0][1][2]
-    original_ball_sizes_blue = ball_sizes[0][2][2]
+    original_major_axis_red = ball_information[0][0][2]
+    original_major_axis_green_green = ball_information[0][1][2]
+    original_major_axis_blue = ball_information[0][2][2]
 
     coords_x, coords_y, coords_z = [], [], []
     prev_pos = INITIAL_CAMERA_POSITION  # Use previous position as initial guess for next frame
 
-    for frame_idx, frame_ball_data in enumerate(ball_sizes):
+    for frame_idx, frame_ball_data in enumerate(ball_information):
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
 
         _, _, red_size, _, _= red_data
@@ -284,19 +283,20 @@ def calculate_camera_positions_from_rgb_distances(ball_sizes):
         try:
             approx_distances = []
             current_sizes = [red_size, green_size, blue_size]
-            original_s = [original_ball_sizes_red, original_ball_sizes_green, original_ball_sizes_blue]
+            original_s = [original_major_axis_red, original_major_axis_green_green, original_major_axis_blue]
 
             for i in range(3):
                 size = current_sizes[i]
                 orig_s = original_s[i]
-                dist = 18 * (orig_s / size)
+                dist = INITIAL_BALL_DISTANCE[i] * (orig_s / size)
                 approx_distances.append(dist)
 
             # the optimization and analytical approach have similar results
             # now choosing optimization to be able to add extra parameters
             camera_pos = estimate_camera_position(
                 *approx_distances,
-                initial_guess=prev_pos
+                initial_guess=prev_pos,
+                center=TRIANGLE_CENTER if center is None else center[frame_idx]
             )
 
             # camera_pos = apex_coordinates(*approx_distances)
@@ -319,22 +319,27 @@ def calculate_camera_positions_from_rgb_distances(ball_sizes):
     return coords_x, coords_y, coords_z
 
 
-def calculate_triangle(ball_sizes):
-    original_green_x = ball_sizes[0][1][0]
-    original_blue_x = ball_sizes[0][2][0]
+def analyze_ball_information(ball_information):
+    original_green_x = ball_information[0][1][0]
+    original_blue_x = ball_information[0][2][0]
     original_dist_green_blue = abs(original_green_x - original_blue_x)
 
     green_blue_angles = []  # New list to store angles
     green_blue_distances = []
-    triangle_center_x, triangle_center_y = [], []
+    triangle_center = []
+    triangle_center_offset_px = []
 
-    for frame_idx, frame_ball_data in enumerate(ball_sizes):
+    for frame_idx, frame_ball_data in enumerate(ball_information):
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
 
         # Calculate Green-Blue angle
         green_x, green_y, _, _, _ = green_data
         blue_x, blue_y, _, _, _ = blue_data
         red_x, red_y, _, _, _ = red_data
+
+        # Calculate the midpoint between green and blue
+        mid_x = (green_x + blue_x) / 2
+        mid_y = (green_y + blue_y) / 2
 
         angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
         green_blue_angles.append(math.degrees(angle_rad))
@@ -343,13 +348,25 @@ def calculate_triangle(ball_sizes):
         green_blue_distances.append(new_distance / original_dist_green_blue * TRIANGLE_SIZE)
 
         # Calculate average x and y from red, green, and blue
-        avg_x = (red_x + green_x + blue_x) / 3
-        avg_y = (red_y + green_y + blue_y) / 3
+        center_x_px = (red_x + green_x + blue_x) / 3
+        center_y_px = (red_y + green_y + blue_y) / 3
 
-        triangle_center_x.append(avg_x)
-        triangle_center_y.append(avg_y)
+        # Calculate the distance between red and the midpoint
+        triangle_height_px = math.sqrt((mid_x - red_x)**2 + (mid_y - red_y)**2)
 
-    return green_blue_angles, green_blue_distances, triangle_center_x, triangle_center_y
+        # Calculate the distance between green and blue
+        triangle_width_px = math.sqrt((blue_x - green_x)**2 + (blue_y - green_y)**2)
+
+        # estimate triangle center
+        # TODO: y is actually reversed, but because we did not take that into account at any point, we should
+        #  also not do it here. check if this leads to problems (we could reverse y in the input)
+        center_x = ((center_x_px - (VIDEO_WIDTH / 2)) / triangle_width_px * TRIANGLE_SIZE) + CENTER_X
+        center_y = ((center_y_px - (VIDEO_HEIGHT / 2)) / triangle_height_px * TRIANGLE_HEIGHT) + POLE_SIZE
+
+        triangle_center.append(np.array([center_x, center_y, 0]))
+        triangle_center_offset_px.append(np.array([center_x_px - (VIDEO_WIDTH / 2), center_y_px - (VIDEO_HEIGHT / 2)]))
+
+    return green_blue_angles, green_blue_distances, triangle_center, triangle_center_offset_px
 
 
 # bit overcomplicated, but could be useful later on
@@ -433,4 +450,92 @@ def calculate_slope_of_horizontal_line_in_image(
     
     slope = delta_v / delta_u
     return slope
+
+def butter_lowpass_filter(data, cutoff, fs, order):
+    nyq = 0.5 * fs  # Nyquist Frequency
+    normal_cutoff = cutoff / nyq
+    # Get the filter coefficients
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    y = filtfilt(b, a, data, axis=0)
+    return y
+
+# Maybe good for later use
+def calculate_perspective_midpoint_3d(
+    p1_world: np.ndarray,
+    p2_world: np.ndarray,
+    camera_position_world: np.ndarray,
+    camera_yaw_degrees: float,
+    camera_pitch_degrees: float,
+    camera_roll_degrees: float,
+    intrinsics: dict
+) -> np.ndarray:
+    """
+    Calculates the 3D world coordinates of a point that appears as the visual
+    midpoint between p1_world and p2_world when projected into a camera image.
+
+    The 3D depth of this perspective midpoint is assumed to be the average
+    of the depths of p1_world and p2_world in camera space.
+
+    Parameters:
+    - p1_world (np.ndarray): (3,) XYZ coordinates of the first point in world space.
+    - p2_world (np.ndarray): (3,) XYZ coordinates of the second point in world space.
+    - camera_position_world (np.ndarray): (3,) XYZ position of the camera in world space.
+    - camera_yaw_degrees (float): Camera yaw (rotation around initial Y-axis, degrees).
+    - camera_pitch_degrees (float): Camera pitch (rotation around new X-axis, degrees).
+    - camera_roll_degrees (float): Camera roll (rotation around newest Z-axis, degrees).
+                                   Uses an intrinsic 'yxz' Euler sequence.
+    - intrinsics (dict): Camera intrinsic parameters {'fx': float, 'fy': float, 'cx': float, 'cy': float}.
+
+    Returns:
+    - np.ndarray: (3,) XYZ coordinates of the perspective midpoint in world space.
+                  Returns np.array([np.nan, np.nan, np.nan]) if points are behind the camera
+                  or projection is otherwise problematic.
+    """
+    from scipy.spatial.transform import Rotation
+
+    # Create rotation matrix representing camera orientation in the world (R_cw)
+    rot = Rotation.from_euler('yxz', [camera_yaw_degrees, camera_pitch_degrees, camera_roll_degrees], degrees=True)
+    R_cw = rot.as_matrix()  # Orientation of camera frame in world frame
+
+    # Rotation matrix from world to camera frame
+    R_wc = R_cw.T
+
+    # Transform points from world to camera coordinates
+    p1_cam = R_wc @ (p1_world - camera_position_world)
+    p2_cam = R_wc @ (p2_world - camera_position_world)
+
+    epsilon = 1e-6
+    # Check if points are at or behind the camera's image plane
+    if p1_cam[2] <= epsilon or p2_cam[2] <= epsilon:
+        return np.array([np.nan, np.nan, np.nan])
+
+    # Project points to image plane
+    fx, fy = intrinsics['fx'], intrinsics['fy']
+    cx, cy = intrinsics['cx'], intrinsics['cy']
+
+    u1 = fx * p1_cam[0] / p1_cam[2] + cx
+    v1 = fy * p1_cam[1] / p1_cam[2] + cy
+
+    u2 = fx * p2_cam[0] / p2_cam[2] + cx
+    v2 = fy * p2_cam[1] / p2_cam[2] + cy
+
+    # Calculate 2D midpoint
+    u_mid = (u1 + u2) / 2
+    v_mid = (v1 + v2) / 2
+
+    # Determine Z-depth for the midpoint in camera coordinates (average depth)
+    Z_mid_cam = (p1_cam[2] + p2_cam[2]) / 2
+
+    if Z_mid_cam <= epsilon:
+        return np.array([np.nan, np.nan, np.nan])
+
+    # Unproject 2D midpoint to 3D camera coordinates
+    X_mid_cam = (u_mid - cx) * Z_mid_cam / fx
+    Y_mid_cam = (v_mid - cy) * Z_mid_cam / fy
+    P_mid_cam = np.array([X_mid_cam, Y_mid_cam, Z_mid_cam])
+
+    # Transform 3D midpoint from camera coordinates back to world coordinates
+    P_mid_world = R_cw @ P_mid_cam + camera_position_world
+
+    return P_mid_world
 
