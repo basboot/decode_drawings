@@ -14,6 +14,11 @@ from helper_functions import *
 def get_video_data(video, use_cache = True):
     ball_sizes = []
 
+    extension = "mp4"
+
+    if video in ["7", "8"]:
+        extension = "webm"
+
     ball_data_filepath = f"data/ball_sizes_data{video}.json"
 
     data_loaded_successfully = False
@@ -31,7 +36,7 @@ def get_video_data(video, use_cache = True):
 
     if not data_loaded_successfully:
         print("Processing video to gather ball data...")
-        cap = cv2.VideoCapture(f"videos/{video}.mp4")
+        cap = cv2.VideoCapture(f"videos/{video}.{extension}")
 
         frame_width = None
         frame_height = None
@@ -69,23 +74,50 @@ def get_video_data(video, use_cache = True):
             mask_green = cv2.inRange(hsv, lower_green, upper_green)
             mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
 
+            # TODO: create functions to easiliy choose between masks
+            # Convert to RGB for better color segmentation
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Create better masks based on RGB dominance and account for shadows
+            red_mask = (rgb[:, :, 0] > 100) & (rgb[:, :, 0] > rgb[:, :, 1] + 30) & (rgb[:, :, 0] > rgb[:, :, 2] + 30)
+            green_mask = (rgb[:, :, 1] > 100) & (rgb[:, :, 1] > rgb[:, :, 0] + 30) & (rgb[:, :, 1] > rgb[:, :, 2] + 30) & (rgb[:, :, 2] < 100)
+            blue_mask = (rgb[:, :, 2] > 100) & (rgb[:, :, 2] > rgb[:, :, 0] + 30) & (rgb[:, :, 2] > rgb[:, :, 1] + 30)
+
+            # Convert boolean masks to uint8 (binary masks)
+            mask_red = red_mask.astype(np.uint8) * 255
+            mask_green = green_mask.astype(np.uint8) * 255
+            mask_blue = blue_mask.astype(np.uint8) * 255
+
             current_frame_data = []  # Stores [R_data, G_data, B_data] for this frame
             output = frame.copy()
 
             for color_mask, color_name in [(mask_red, RED), (mask_green, GREEN), (mask_blue, BLUE)]:
                 contours, _ = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 ball_found_for_color = False
+                largest_contour = None
+                max_points = 0
+
                 for cnt in contours:
-                    if len(cnt) >= 5:
-                        ellipse = cv2.fitEllipse(cnt)
-                        cv2.ellipse(output, ellipse, (0, 255, 0), 2)
-                        (x_ellipse, y_ellipse), (major, minor), angle_ellipse = ellipse
+                    num_points = len(cnt)
+                    if num_points > max_points:
+                        largest_contour = cnt
+                        max_points = num_points
 
-                        ball_data = [x_ellipse, y_ellipse, major, minor, angle_ellipse]
-                        current_frame_data.append(ball_data)
+                lengths = [len(cnt) for cnt in contours]
+                lengths.sort(reverse=True)
+                if len(lengths) > 1 and lengths[1] > 4:
+                    print("WARNING: multiple large countours")
 
-                        ball_found_for_color = True
-                        break  # Take first good contour for this color
+                if largest_contour is not None:
+                    ellipse = cv2.fitEllipse(largest_contour)
+                    print(f"Frame: {count} #points {len(largest_contour)}", lengths)
+                    cv2.ellipse(output, ellipse, (0, 255, 0), 2)
+                    (x_ellipse, y_ellipse), (major, minor), angle_ellipse = ellipse
+
+                    ball_data = [x_ellipse, y_ellipse, major, minor, angle_ellipse]
+                    current_frame_data.append(ball_data)
+
+                    ball_found_for_color = True
 
                 if not ball_found_for_color:
                     assert count > 0, f"Problem reading first frame, cannot find color {color_name}."
