@@ -3,6 +3,7 @@ import math
 import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import butter,filtfilt
+from moviepy import *
 
 
 from global_settings import *
@@ -538,4 +539,44 @@ def calculate_perspective_midpoint_3d(
     P_mid_world = R_cw @ P_mid_cam + camera_position_world
 
     return P_mid_world
+
+
+def get_audio_levels_per_frame(video_path):
+    clip = VideoFileClip(video_path)
+    audio = clip.audio
+    n_frames = clip.n_frames
+
+    # create fake volume, if clip has no audio
+    if audio is None:
+        return [-40] * (n_frames + 1) # TODO: why does videoclip has frame less than opencv for test mp4
+
+    levels = []
+
+    audio_clip = audio.to_soundarray()
+    frame_duration = len(audio_clip) // n_frames
+
+    # TODO: CHECK frame duration!
+
+    # Loop over each video frame time
+    for i in range(n_frames):
+        t_start = i * frame_duration
+        t_end = t_start + frame_duration
+
+        samples = audio_clip[t_start:t_end]
+
+        # Convert stereo to mono if needed
+        if samples.ndim == 2:
+            samples = samples.mean(axis=1)
+
+        # Calculate RMS volume (can use other metrics)
+        rms = np.sqrt(np.mean(samples ** 2))
+        db = 20 * np.log10(rms + 1e-10)  # dB, avoid log(0)
+
+        levels.append(db)
+
+    # print(levels)
+    # print(len(levels))
+
+    return levels
+
 

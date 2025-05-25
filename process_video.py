@@ -5,6 +5,7 @@ import math
 import json  # Added for saving data
 import os  # Added for checking file existence
 
+
 from global_settings import *
 from helper_functions import *
 
@@ -28,6 +29,7 @@ def get_video_data(video, use_cache = True):
             with open(ball_data_filepath, "r") as f:
                 loaded_data = json.load(f)
             ball_sizes = loaded_data['ball_data']
+            video_info_property = loaded_data['video']
             print("Ball data loaded successfully from file.")
             data_loaded_successfully = True
         except Exception as e:
@@ -35,8 +37,13 @@ def get_video_data(video, use_cache = True):
             ball_sizes = []
 
     if not data_loaded_successfully:
+        print("Processing video to gather sound data...")
+        audio_levels = get_audio_levels_per_frame(f"videos/{video}.{extension}")
+
         print("Processing video to gather ball data...")
         cap = cv2.VideoCapture(f"videos/{video}.{extension}")
+
+
 
         frame_width = None
         frame_height = None
@@ -110,7 +117,7 @@ def get_video_data(video, use_cache = True):
 
                 if largest_contour is not None:
                     ellipse = cv2.fitEllipse(largest_contour)
-                    print(f"Frame: {count} #points {len(largest_contour)}", lengths)
+                    # print(f"Frame: {count} #points {len(largest_contour)}", lengths)
                     cv2.ellipse(output, ellipse, (0, 255, 0), 2)
                     (x_ellipse, y_ellipse), (major, minor), angle_ellipse = ellipse
 
@@ -142,7 +149,8 @@ def get_video_data(video, use_cache = True):
             "name": str(video),
             "frames": total_frames_in_video,
             "width": frame_width,
-            "height": frame_height
+            "height": frame_height,
+            "volume": audio_levels
         }
         data_to_save = {
             'video': video_info_property,
@@ -159,4 +167,4 @@ def get_video_data(video, use_cache = True):
         print("Error: Ball data is not available after attempting load/processing. Exiting.")
         exit()
 
-    return ball_sizes
+    return ball_sizes, video_info_property
