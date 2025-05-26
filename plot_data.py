@@ -4,15 +4,18 @@ import numpy as np
 
 # Helper function to plot a single subplot
 def _plot_single_subplot_in_grid(ax, x_data, y_data, num_frames, color_indices, cmap, norm_factor,
-                               xlabel, ylabel, title, marker, marker_size, equal_axis=False):
+                               xlabel, ylabel, title, marker, marker_size, color=None, equal_axis=False, scatter_only=False, mirror_y = False):
     """Helper function to draw a single subplot with common styling."""
-    if num_frames > 1:
+    if mirror_y:
+        y_data = [-y for y in y_data]
+    
+    if num_frames > 1 and not scatter_only:
         # Plot lines connecting the points
-        for i in range(num_frames - 1):
+        for i in range(len(x_data) - 1):
             ax.plot([x_data[i], x_data[i + 1]], [y_data[i], y_data[i + 1]],
-                     color=cmap(color_indices[i] / norm_factor), linestyle='-')
+                     color=cmap(color_indices[i] / norm_factor) if color is None else color, linestyle='-')
     # Plot scatter points
-    ax.scatter(x_data, y_data, c=color_indices, cmap=cmap, marker=marker, s=marker_size, zorder=2, linewidth=0)
+    ax.scatter(x_data, y_data, c=color_indices if color is None else color, cmap=cmap, marker=marker, s=marker_size, zorder=2, linewidth=0)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
@@ -49,7 +52,10 @@ def plot_data_grid(plot_configurations, num_frames, video_id_str, show_plot = Tr
             config["title"],
             config["marker"],
             config["marker_size"],
-            config.get("equal_axis", False) # Use .get for optional 'equal_axis'
+            config["color"],
+            config.get("equal_axis", False), # Use .get for optional 'equal_axis',
+            config.get("scatter_only", False), # Use .get for optional 
+            config.get("mirror_y", False) # Use .get for optional 
         )
 
     plt.tight_layout()
