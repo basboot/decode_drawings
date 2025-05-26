@@ -17,7 +17,7 @@ def get_video_data(video, use_cache = True):
 
     extension = "mp4"
 
-    if video in ["7", "8"]:
+    if video in ["7", "8", "9", "10", "11", "12"]:
         extension = "webm"
 
     ball_data_filepath = f"data/ball_sizes_data{video}.json"

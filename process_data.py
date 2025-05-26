@@ -8,25 +8,15 @@ from process_video import get_video_data
 
 if __name__ == '__main__':
 
-    VIDEO = "8"
+    VIDEO = "12"
     ball_information, video_information = get_video_data(VIDEO)
     ball_information = np.array(ball_information)
     # 1-2 Hz cutoff is needed to fully to cancel measurement noise
-    ball_information = butter_lowpass_filter(ball_information, 1.5, 60, 2)
+    # ball_information = butter_lowpass_filter(ball_information, 1.5, 60, 2)
 
-    print(len(video_information["volume"]))
+    green_blue_angles, green_blue_distances, horizontal_offsets = analyze_ball_information(ball_information)
 
-    green_blue_angles, green_blue_distances, center, center_offset_px = analyze_ball_information(ball_information)
-    center_offset_px = np.array(center_offset_px)
-
-    # correct center
-    # centers of the balls aren't used, so correcting them won't do anything
-    ball_information[:, 0, 0:2] -= center_offset_px
-    ball_information[:, 1, 0:2] -= center_offset_px
-    ball_information[:, 2, 0:2] -= center_offset_px
-
-
-    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_major_axis(ball_information)
+    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_major_axis(ball_information, horizontal_offsets)
 
 
     # coords_x, coords_y, coords_z = smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average', window_size=5)
@@ -37,8 +27,6 @@ if __name__ == '__main__':
     coords_x = np.array(coords_x)
     coords_y = np.array(coords_y)
     coords_z = np.array(coords_z)
-
-    center = np.array(center)
 
     green_blue_angles = np.array(green_blue_angles)
 
@@ -72,8 +60,8 @@ if __name__ == '__main__':
             "marker": 'o', "marker_size": 25
         },
         {
-            "x_data": frames_indices, "y_data": center[:, 0],
-            "xlabel": 'Frame', "ylabel": 'center x', "title": 'estimated center x',
+            "x_data": frames_indices, "y_data": horizontal_offsets,
+            "xlabel": 'Frame', "ylabel": 'offset', "title": 'estimated cameraoffset from center',
             "marker": '.', "marker_size": 30
         },
         {

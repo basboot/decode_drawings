@@ -3,6 +3,7 @@ import math
 import numpy as np
 from scipy.optimize import minimize
 from scipy.signal import butter,filtfilt
+from sympy import symbols, Eq, solve, simplify
 from moviepy import *
 
 
@@ -19,7 +20,7 @@ def estimate_undistorted_radius(major, minor):
     return r_undistorted
 
 # calculate error for camera position, based in distances to ball and ball positions for optimization
-def calculate_camera_error(pos, distances, ball_positions, center):
+def calculate_camera_error(pos, distances, ball_positions):
     """
     Calculate error between expected distances and actual distances,
     taking into account that camera is looking at triangle center.
@@ -28,7 +29,7 @@ def calculate_camera_error(pos, distances, ball_positions, center):
     error = 0
 
     # Vector from camera to center (viewing direction)
-    to_center = center - pos
+    to_center = TRIANGLE_CENTER - pos
     to_center = to_center / np.linalg.norm(to_center)
 
     for ball_pos, target_dist in zip(ball_positions, distances):
@@ -50,7 +51,7 @@ def calculate_camera_error(pos, distances, ball_positions, center):
 
 
 # estimate camera position, using calculate_camera_error
-def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None, center=TRIANGLE_CENTER):
+def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None):
     """
     Estimate camera position using optimization.
     Takes into account that camera is always looking at triangle center.
@@ -63,13 +64,13 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     if initial_guess is None:
         # Make initial guess based on average distance
         avg_dist = sum(distances) / 3
-        initial_guess = [CENTER_X, POLE_SIZE, avg_dist]
+        initial_guess = TRIANGLE_CENTER
 
     # Use optimization to find best camera position
     result = minimize(
         calculate_camera_error,
         initial_guess,
-        args=(distances, ball_positions, TRIANGLE_CENTER),
+        args=(distances, ball_positions),
         method='Nelder-Mead'
     )
 
@@ -265,7 +266,7 @@ def slam_like_loop_closure(coords_x, coords_z):
     return coords_x, coords_z
 
 
-def calculate_camera_positions_from_rgb_major_axis(ball_information, center=None):
+def calculate_camera_positions_from_rgb_major_axis(ball_information, center_x=None):
     # major axes are the sizes (for now)
     original_major_axis_red = ball_information[0][0][2]
     original_major_axis_green_green = ball_information[0][1][2]
@@ -296,8 +297,7 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, center=None
             # now choosing optimization to be able to add extra parameters
             camera_pos = estimate_camera_position(
                 *approx_distances,
-                initial_guess=prev_pos,
-                center=TRIANGLE_CENTER if center is None else center[frame_idx]
+                initial_guess=prev_pos
             )
 
             # camera_pos = apex_coordinates(*approx_distances)
@@ -327,8 +327,7 @@ def analyze_ball_information(ball_information):
 
     green_blue_angles = []  # New list to store angles
     green_blue_distances = []
-    triangle_center = []
-    triangle_center_offset_px = []
+    horizontal_offsets = []
 
     for frame_idx, frame_ball_data in enumerate(ball_information):
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
@@ -338,9 +337,11 @@ def analyze_ball_information(ball_information):
         blue_x, blue_y, _, _, _ = blue_data
         red_x, red_y, _, _, _ = red_data
 
-        # Calculate the midpoint between green and blue
-        mid_x = (green_x + blue_x) / 2
-        mid_y = (green_y + blue_y) / 2
+        # calculate camera offset in x direction
+        # because vertical lines stay vertical under projection, we can use red_x as midpoint
+        horizontal_offset = calculate_horizontal_distance_from_center(green_x, blue_x, red_x, VIDEO_WIDTH / 2)
+        horizontal_offsets.append(horizontal_offset)
+        
 
         angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
         green_blue_angles.append(math.degrees(angle_rad))
@@ -348,26 +349,7 @@ def analyze_ball_information(ball_information):
         new_distance = abs(green_x - blue_x)
         green_blue_distances.append(new_distance / original_dist_green_blue * TRIANGLE_SIZE)
 
-        # Calculate average x and y from red, green, and blue
-        center_x_px = (red_x + green_x + blue_x) / 3
-        center_y_px = (red_y + green_y + blue_y) / 3
-
-        # Calculate the distance between red and the midpoint
-        triangle_height_px = math.sqrt((mid_x - red_x)**2 + (mid_y - red_y)**2)
-
-        # Calculate the distance between green and blue
-        triangle_width_px = math.sqrt((blue_x - green_x)**2 + (blue_y - green_y)**2)
-
-        # estimate triangle center
-        # TODO: y is actually reversed, but because we did not take that into account at any point, we should
-        #  also not do it here. check if this leads to problems (we could reverse y in the input)
-        center_x = ((center_x_px - (VIDEO_WIDTH / 2)) / triangle_width_px * TRIANGLE_SIZE) + CENTER_X
-        center_y = ((center_y_px - (VIDEO_HEIGHT / 2)) / triangle_height_px * TRIANGLE_HEIGHT) + POLE_SIZE
-
-        triangle_center.append(np.array([center_x, center_y, 0]))
-        triangle_center_offset_px.append(np.array([center_x_px - (VIDEO_WIDTH / 2), center_y_px - (VIDEO_HEIGHT / 2)]))
-
-    return green_blue_angles, green_blue_distances, triangle_center, triangle_center_offset_px
+    return green_blue_angles, green_blue_distances, horizontal_offsets
 
 
 # bit overcomplicated, but could be useful later on
@@ -579,4 +561,29 @@ def get_audio_levels_per_frame(video_path):
 
     return levels
 
+def calculate_horizontal_distance_from_center(left_x, right_x, mid_x, desired_x):
+    # https://en.wikipedia.org/wiki/Cross-ratio
 
+  
+    a = left_x
+    b = right_x
+    c = mid_x
+    d = desired_x
+
+    num = (c - a) * (d - b)
+    den = (c - b) * (d - a)
+
+    assert den != 0, "division by zero, c == b or d == a"
+
+    cross_ratio = num / den
+
+    a_real = 0
+    b_real = TRIANGLE_SIZE
+    c_real = CENTER_X
+
+    d_real = (a_real - b_real) / ((cross_ratio * (c_real - b_real)) / (c_real - a_real) - 1) + a_real 
+
+    return d_real - CENTER_X
+
+
+    
