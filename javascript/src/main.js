@@ -35,9 +35,9 @@ const sphereGeometry = new THREE.SphereGeometry(radius, 32, 32);
 const redSphere = new THREE.Mesh(sphereGeometry, redMaterial);
 redSphere.position.copy(topPosition);
 const greenSphere = new THREE.Mesh(sphereGeometry, greenMaterial);
-greenSphere.position.copy(bottomLeftPosition);
+greenSphere.position.copy(bottomRightPosition);
 const blueSphere = new THREE.Mesh(sphereGeometry, blueMaterial);
-blueSphere.position.copy(bottomRightPosition);
+blueSphere.position.copy(bottomLeftPosition);
 
 // Add spheres to the scene
 scene.add(redSphere);
@@ -85,19 +85,21 @@ function animate() {
     camera.position.x = circleCenter.x + Math.sin(cameraAngle) * cameraRadius;
     camera.position.y = circleCenter.y;
     camera.position.z = circleCenter.z + Math.cos(cameraAngle) * cameraRadius;
-    // camera.lookAt(0, centerHeight, 0);
-    let offset = 0;
-    if (cameraAngle > -Math.PI / 2) {
-      offset = 3;
-    }
-    if (cameraAngle > 0) {
-      offset = -3;
-    }
-    if (cameraAngle > Math.PI / 2) {
-      offset = 0;
-    }
+    camera.lookAt(0, centerHeight, 0);
+    let offset = Math.sin(cameraAngle * 10) * 1;
+    // offset = 0;
+    // if (cameraAngle > -Math.PI / 2) {
+    //   offset = 3;
+    // }
+    // if (cameraAngle > 0) {
+    //   offset = -3;
+    // }
+    // if (cameraAngle > Math.PI / 2) {
+    //   offset = 0;
+    // }
 
-    camera.lookAt(offset, centerHeight, 0);
+    // camera.lookAt(offset, centerHeight, 0);
+    camera.rotateZ(offset * 0.025);
 
     renderer.render(scene, camera);
 
