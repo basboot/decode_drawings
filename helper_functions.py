@@ -266,7 +266,7 @@ def slam_like_loop_closure(coords_x, coords_z):
     return coords_x, coords_z
 
 
-def calculate_camera_positions_from_rgb_major_axis(ball_information, center_x=None):
+def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None):
     # major axes are the sizes (for now)
     original_major_axis_red = ball_information[0][0][2]
     original_major_axis_green_green = ball_information[0][1][2]
@@ -301,6 +301,19 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, center_x=No
             )
 
             # camera_pos = apex_coordinates(*approx_distances)
+
+            # # try to fix position the naive way
+            to_center = TRIANGLE_CENTER - camera_pos
+            to_center[1] = 0  # project on x, z
+
+            # # Create a vector perpendicular to to_center in the x-z plane
+            perpendicular_vector = np.array([-to_center[2], 0, to_center[0]])
+            perpendicular_vector = perpendicular_vector / np.linalg.norm(perpendicular_vector)
+            if offset_x is not None:
+                camera_pos += -perpendicular_vector * offset_x[frame_idx]
+
+
+            
 
             prev_pos = camera_pos
 
