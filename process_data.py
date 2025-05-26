@@ -8,7 +8,7 @@ from process_video import get_video_data
 
 if __name__ == '__main__':
 
-    VIDEO = "3"
+    VIDEO = "1"
     ball_information, video_information = get_video_data(VIDEO)
     ball_information = np.array(ball_information)
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     # plot data
     plot_data_grid(plot_configs, num_frames, VIDEO)
 
-    with open(f"drawing{VIDEO}.txt", "w") as f:
+    with open(f"drawings/drawing{VIDEO}.txt", "w") as f:
         for x, z in zip(drawing_x, drawing_y):
             f.write(f"{x} {z}\n")
 
