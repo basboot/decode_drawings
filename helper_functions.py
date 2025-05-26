@@ -310,7 +310,7 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=No
             perpendicular_vector = np.array([-to_center[2], 0, to_center[0]])
             perpendicular_vector = perpendicular_vector / np.linalg.norm(perpendicular_vector)
             if offset_x is not None:
-                camera_pos += -perpendicular_vector * offset_x[frame_idx]
+                camera_pos += perpendicular_vector * offset_x[frame_idx]
 
 
             
@@ -352,7 +352,7 @@ def analyze_ball_information(ball_information):
 
         # calculate camera offset in x direction
         # because vertical lines stay vertical under projection, we can use red_x as midpoint
-        horizontal_offset = calculate_horizontal_distance_from_center(green_x, blue_x, red_x, VIDEO_WIDTH / 2)
+        horizontal_offset = calculate_horizontal_distance_from_center(blue_x, green_x, red_x, VIDEO_WIDTH / 2)
         horizontal_offsets.append(horizontal_offset)
         
 
