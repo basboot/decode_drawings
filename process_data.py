@@ -8,11 +8,22 @@ from process_video import get_video_data
 
 if __name__ == '__main__':
 
-    VIDEO = "12"
+    VIDEO = "3"
     ball_information, video_information = get_video_data(VIDEO)
     ball_information = np.array(ball_information)
-    # 1-2 Hz cutoff is needed to fully to cancel measurement noise
-    # ball_information = butter_lowpass_filter(ball_information, 1.5, 60, 2)
+
+    print(f"Number of video frames: {len(ball_information)}")
+    print(f"Number of audio frames: {len(video_information['volume'])}")
+
+    # work around, for missing one frame
+    while len(video_information['volume']) < len(ball_information):
+              video_information['volume'].append(video_information['volume'][-1])
+              
+    # 1-2 Hz cutoff at least needed to cancel measurement noise
+    # ball_information = butter_lowpass_filter(ball_information, 5, 60, 2)
+
+    # filter audio
+    video_information['volume'] = butter_lowpass_filter(video_information['volume'], 1, 60, 2)
 
     green_blue_angles, green_blue_distances, horizontal_offsets = analyze_ball_information(ball_information)
 
@@ -46,28 +57,34 @@ if __name__ == '__main__':
 
     angles_to_plot_ft = butter_lowpass_filter(angles_to_plot, 0.5, 60, 2)
 
+    drawing_x, drawing_y = [], []
+    for i in range(len(coords_x)):
+        if video_information["volume"][i] > DRAWING_VOLUME:
+            drawing_x.append(coords_x[i])
+            drawing_y.append(coords_z[i])
+
 
     # Define configurations for each plot
     plot_configs = [
         {
             "x_data": coords_x, "y_data": coords_z,
             "xlabel": 'X', "ylabel": 'Z', "title": 'Top View (X-Z)',
-            "marker": 'o', "marker_size": 25, "equal_axis": True
+            "marker": 'o', "marker_size": 25, "color": None, "equal_axis": True, "mirror_y": True
         },
         {
-            "x_data": frames_indices, "y_data": coords_y,
-            "xlabel": 'Frame', "ylabel": 'Y (height)', "title": 'Camera Height',
-            "marker": 'o', "marker_size": 25
+            "x_data": drawing_x, "y_data": drawing_y,
+            "xlabel": 'X', "ylabel": 'Z', "title": 'Drawing',
+            "marker": 'o', "marker_size": 10, "color": "k",  "equal_axis": True, "scatter_only": True, "mirror_y": True
         },
         {
             "x_data": frames_indices, "y_data": horizontal_offsets,
             "xlabel": 'Frame', "ylabel": 'offset', "title": 'estimated cameraoffset from center',
-            "marker": '.', "marker_size": 30
+            "marker": '.', "marker_size": 30, "color": None, 
         },
         {
             "x_data": frames_indices, "y_data": video_information["volume"],
             "xlabel": 'Frame', "ylabel": 'volume (db)', "title": 'video volume',
-            "marker": '.', "marker_size": 30
+            "marker": '.', "marker_size": 30, "color": None, 
         },
     ]
 
@@ -75,6 +92,6 @@ if __name__ == '__main__':
     plot_data_grid(plot_configs, num_frames, VIDEO)
 
     with open(f"drawing{VIDEO}.txt", "w") as f:
-        for x, z in zip(coords_x, coords_z):
+        for x, z in zip(drawing_x, drawing_y):
             f.write(f"{x} {z}\n")
 
