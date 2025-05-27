@@ -30,7 +30,7 @@ def calculate_camera_error(pos, distances, ball_positions):
 
         # Calculate angle between viewing direction and ball direction
         to_ball_norm = to_ball / dist
-        cos_angle = np.dot(to_ball_norm, to_center) # als dezelfde kant op dan is cos_angle 0
+        cos_angle = np.dot(to_ball_norm, to_center)
 
         # Penalize both distance error and deviation from expected viewing angle
         angle_error = 1 - cos_angle  # 0 when looking directly at ball
