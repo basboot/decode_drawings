@@ -17,9 +17,6 @@ def get_video_data(video, use_cache = True):
 
     extension = "mp4"
 
-    if video in ["7", "8", "9", "10", "11", "12"]:
-        extension = "webm"
-
     ball_data_filepath = f"data/ball_sizes_data{video}.json"
 
     data_loaded_successfully = False
@@ -38,6 +35,12 @@ def get_video_data(video, use_cache = True):
 
     if not data_loaded_successfully:
         print("Processing video to gather sound data...")
+
+
+        if not os.path.exists(f"videos/{video}.{extension}"):
+            print("mp4 not found, fallback to webm")
+            extension = "webm"
+
         audio_levels = get_audio_levels_per_frame(f"videos/{video}.{extension}")
 
         print("Processing video to gather ball data...")
