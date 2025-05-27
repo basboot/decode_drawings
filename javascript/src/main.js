@@ -1,3 +1,5 @@
+// https://community.gopro.com/s/article/HERO8-Black-Digital-Lenses-formerly-known-as-FOV?language=en_US
+
 import * as THREE from "three";
 
 // Create a scene
@@ -16,11 +18,16 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(1280, 720);
 document.body.appendChild(renderer.domElement);
 
+// Add a light source
+const light = new THREE.DirectionalLight(0xffffff, 5); // Increased intensity to 2
+light.position.set(0, 20, 100); // Position the light
+scene.add(light);
+
 // Remove the cube and add three spheres in an equilateral triangle
 const radius = 3;
-const redMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-const greenMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const blueMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.8, metalness: 0.2 }); // Increased roughness, decreased metalness
+const greenMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00, roughness: 0.8, metalness: 0.2 }); // Increased roughness, decreased metalness
+const blueMaterial = new THREE.MeshStandardMaterial({ color: 0x0000ff, roughness: 0.8, metalness: 0.2 }); // Increased roughness, decreased metalness
 
 // Calculate positions for the equilateral triangle
 const centerHeight = 18;
@@ -52,9 +59,11 @@ camera.lookAt(0, centerHeight, 0);
 const capturer = new CCapture({ format: "webm", framerate: 60 });
 let isCapturing = false;
 
+const DEBUG = false;
+
 // Start capturing when the animation begins
 function startCapture() {
-  if (!isCapturing) {
+  if (!isCapturing && !DEBUG) {
     capturer.start();
     isCapturing = true;
   }
@@ -62,7 +71,7 @@ function startCapture() {
 
 // Stop capturing and save the video
 function stopCapture() {
-  if (isCapturing) {
+  if (isCapturing && !DEBUG) {
     capturer.stop();
     capturer.save();
     isCapturing = false;
@@ -98,8 +107,8 @@ function animate() {
     //   offset = 0;
     // }
 
-    // camera.lookAt(offset, centerHeight, 0);
-    camera.rotateZ(offset * 0.025);
+    camera.lookAt(offset, centerHeight + offset, 0);
+    // camera.rotateZ(offset * 0.025);
 
     renderer.render(scene, camera);
 
