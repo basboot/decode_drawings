@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import math
 
 
 # Helper function to plot a single subplot
 def _plot_single_subplot_in_grid(ax, x_data, y_data, num_frames, color_indices, cmap, norm_factor,
                                xlabel, ylabel, title, marker, marker_size, color=None, equal_axis=False, scatter_only=False, mirror_y = False):
-    """Helper function to draw a single subplot with common styling."""
     if mirror_y:
         y_data = [-y for y in y_data]
     
@@ -15,6 +15,7 @@ def _plot_single_subplot_in_grid(ax, x_data, y_data, num_frames, color_indices, 
             ax.plot([x_data[i], x_data[i + 1]], [y_data[i], y_data[i + 1]],
                      color=cmap(color_indices[i] / norm_factor) if color is None else color, linestyle='-')
     # Plot scatter points
+    # TODO: fix single color
     ax.scatter(x_data, y_data, c=color_indices if color is None else color, cmap=cmap, marker=marker, s=marker_size, zorder=2, linewidth=0)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -31,14 +32,13 @@ def plot_data_grid(plot_configurations, num_frames, video_id_str, show_plot = Tr
     norm_factor = (num_frames - 1.0) if num_frames > 1 else 1.0
 
 
-    """
-    Creates a 2x2 grid of plots based on the provided configurations,
-    saves it to a PDF, and displays it.
-    """
-    plt.figure(figsize=(15, 10)) # Adjusted figure size for 2x2 layout
+    n_plots = len(plot_configurations)
+    n_rows = math.ceil(n_plots / 2) # 2 plots per row
+
+    plt.figure(figsize=(15, n_rows * 5)) # Adjust figure to number of plots
 
     for i, config in enumerate(plot_configurations):
-        ax = plt.subplot(2, 2, i + 1) # Subplot index from 1 to 4
+        ax = plt.subplot(n_rows, 2, i + 1) 
         _plot_single_subplot_in_grid(
             ax,
             config["x_data"],

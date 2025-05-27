@@ -8,7 +8,7 @@ from process_video import get_video_data
 
 if __name__ == '__main__':
 
-    VIDEO = "1"
+    VIDEO = "2"
     ball_information, video_information = get_video_data(VIDEO)
     ball_information = np.array(ball_information)
 
@@ -55,7 +55,9 @@ if __name__ == '__main__':
     pole_length = 18  # cm
     pole_displacement = pole_length * np.deg2rad(angles_to_plot)
 
-    angles_to_plot_ft = butter_lowpass_filter(angles_to_plot, 0.5, 60, 2)
+    angles_to_plot_ft = butter_lowpass_filter(angles_to_plot, 0.1, 60, 2)
+
+    angle_error = angles_to_plot - angles_to_plot_ft
 
     drawing_x, drawing_y = [], []
     for i in range(len(coords_x)):
@@ -86,10 +88,25 @@ if __name__ == '__main__':
             "xlabel": 'Frame', "ylabel": 'volume (db)', "title": 'video volume',
             "marker": '.', "marker_size": 30, "color": None, 
         },
+        {
+            "x_data": frames_indices, "y_data": angles_to_plot,
+            "xlabel": 'Frame', "ylabel": 'angle', "title": 'green-blue angles',
+            "marker": '.', "marker_size": 30, "color": None, 
+        },
+                {
+            "x_data": frames_indices, "y_data": angles_to_plot_ft,
+            "xlabel": 'Frame', "ylabel": 'angle', "title": 'green-blue angles (filtered)',
+            "marker": '.', "marker_size": 30, "color": None, 
+        },
+                        {
+            "x_data": frames_indices, "y_data": angle_error,
+            "xlabel": 'Frame', "ylabel": 'error', "title": 'green-blue angle error',
+            "marker": '.', "marker_size": 30, "color": None, 
+        },
     ]
 
     # plot data
-    plot_data_grid(plot_configs, num_frames, VIDEO)
+    plot_data_grid(plot_configs, num_frames, VIDEO, show_plot=False)
 
     with open(f"drawings/drawing{VIDEO}.txt", "w") as f:
         for x, z in zip(drawing_x, drawing_y):
