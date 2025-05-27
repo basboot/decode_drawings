@@ -20,6 +20,7 @@ def calculate_camera_error(pos, distances, ball_positions):
 
     # Vector from camera to center (viewing direction)
     to_center = TRIANGLE_CENTER - pos
+    # normalized viewing direction
     to_center = to_center / np.linalg.norm(to_center)
 
     for ball_pos, target_dist in zip(ball_positions, distances):
@@ -29,7 +30,7 @@ def calculate_camera_error(pos, distances, ball_positions):
 
         # Calculate angle between viewing direction and ball direction
         to_ball_norm = to_ball / dist
-        cos_angle = np.dot(to_ball_norm, to_center)
+        cos_angle = np.dot(to_ball_norm, to_center) # als dezelfde kant op dan is cos_angle 0
 
         # Penalize both distance error and deviation from expected viewing angle
         angle_error = 1 - cos_angle  # 0 when looking directly at ball
@@ -67,7 +68,7 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     return result.x
 
 
-def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None):
+def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None, angle_error=None):
     # major axes are the sizes (for now)
     original_major_axis_red = ball_information[0][0][2]
     original_major_axis_green_green = ball_information[0][1][2]
@@ -145,36 +146,74 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=No
     return coords_x, coords_y, coords_z
 
 
-def analyze_ball_information(ball_information):
+def analyze_green_blue_ball(ball_information):
     original_green_x = ball_information[0][1][0]
     original_blue_x = ball_information[0][2][0]
     original_dist_green_blue = abs(original_green_x - original_blue_x)
 
-    green_blue_angles = []  # New list to store angles
+    green_blue_angles = []
     green_blue_distances = []
-    horizontal_offsets = []
 
     for frame_idx, frame_ball_data in enumerate(ball_information):
-        red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
+        green_data, blue_data = frame_ball_data[1], frame_ball_data[2]
 
-        # Calculate Green-Blue angle
         green_x, green_y, _, _, _ = green_data
         blue_x, blue_y, _, _, _ = blue_data
-        red_x, red_y, _, _, _ = red_data
 
-        # calculate camera offset in x direction
-        # because vertical lines stay vertical under projection, we can use red_x as midpoint
-        horizontal_offset = calculate_horizontal_distance_from_center(blue_x, green_x, red_x, VIDEO_WIDTH / 2)
-        horizontal_offsets.append(horizontal_offset)
-        
-
+        # Calculate Green-Blue angle
         angle_rad = math.atan2(blue_y - green_y, blue_x - green_x)
         green_blue_angles.append(math.degrees(angle_rad))
 
         new_distance = abs(green_x - blue_x)
         green_blue_distances.append(new_distance / original_dist_green_blue * TRIANGLE_SIZE)
 
-    return green_blue_angles, green_blue_distances, horizontal_offsets
+    return green_blue_angles, green_blue_distances
+
+
+def calculate_horizontal_offsets(ball_information, angle_error=None):
+    horizontal_offsets = []
+
+    for frame_idx, frame_ball_data in enumerate(ball_information):
+        red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
+
+        red_x, red_y, _, _, _ = red_data
+        green_x, green_y, _, _, _ = green_data
+        blue_x, blue_y, _, _, _ = blue_data
+
+        if angle_error is not None:
+            # Create rotation matrix for the given angle
+            angle_rad = np.radians(-angle_error[frame_idx])
+            cos_angle = np.cos(angle_rad)
+            sin_angle = np.sin(angle_rad)
+
+            rotation_matrix = np.array([
+                [cos_angle, -sin_angle],
+                [sin_angle, cos_angle]
+            ])
+
+            # Center point for rotation
+            center_x = VIDEO_WIDTH / 2
+            center_y = VIDEO_HEIGHT / 2
+
+            # Translate points to origin, apply rotation, and translate back
+            red_coords = np.array([red_x - center_x, red_y - center_y])
+            green_coords = np.array([green_x - center_x, green_y - center_y])
+            blue_coords = np.array([blue_x - center_x, blue_y - center_y])
+
+            red_rotated = rotation_matrix @ red_coords + np.array([center_x, center_y])
+            green_rotated = rotation_matrix @ green_coords + np.array([center_x, center_y])
+            blue_rotated = rotation_matrix @ blue_coords + np.array([center_x, center_y])
+
+            red_x, red_y = red_rotated
+            green_x, green_y = green_rotated
+            blue_x, blue_y = blue_rotated
+
+
+        # Calculate camera offset in x direction
+        horizontal_offset = calculate_horizontal_distance_from_center(blue_x, green_x, red_x, VIDEO_WIDTH / 2)
+        horizontal_offsets.append(horizontal_offset)
+
+    return horizontal_offsets
 
 
 def butter_lowpass_filter(data, cutoff, fs, order):
