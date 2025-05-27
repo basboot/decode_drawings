@@ -24,6 +24,8 @@ A Javascript simulation of the first drawing (a circle) has been used to validat
 without disturbances: camera always horizontal, pointing at the centroid.
 
 The simualtion was also used to validate the assumptions that roll and pitch are (within limits) not very important.
+Update: roll cannot be ignored if combined with yaw, pitch and yaw does not seem to be an extra complication.
+
 Also the horizontal offset estimation was validated with the simulation.
 
 ## Image processing
@@ -39,6 +41,15 @@ proportional to the distance. The 3 distances, in combination with the known vie
 are used to reconstruct the apex of the 'pyramid'.
 
 ## Correcting errors
+
+### Rotation (roll)
+
+To correct rotation of the camera, the angle between blue and green is used. This angle changes slowly due to
+persective while moving. Sudden moves therefore are probably errors. We find these errors by subtracting a low pass
+filter from the measured data. This error angle is then reversed, by rotating the coordinates of red, green and blue
+around the center of the screen, before estimating the horizontal offset.
+
+### Horizontal offset (yaw)
 
 The assumption that the camera is always pointing at the centroid is not true, because of small aiming errors.
 Experiments in simulation show that rotation (roll) which is very small and the y-axis (pitch) are not so much of a
@@ -56,6 +67,7 @@ to avoid reacting to short sounds, makes it clear when the pen is on the paper o
 
 ## Open ideas aka TODO
 
+- Use x, z position to estimate correct angle for blue-green, instead of filtering the measured angles
 - Explore video frames for bad parts of the drawing.
 - Check different color models. RGB works good in simulation, but maybe HSV is better for the real videos
 - Filtering makes the image more smooth, but not necessary more accurate. Needs more experiments. Maybe Kalmann/sensor
