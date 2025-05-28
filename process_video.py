@@ -8,11 +8,12 @@ import os  # Added for checking file existence
 
 from global_settings import *
 from helper_functions import *
+from tqdm import tqdm
 
 
 # processes the given video (only use the number of the video 1-6) and returns original_ball_sizes, ball_sizes
 # also saves the data to disc, and tries to reuse unless use_cache = False
-def get_video_data(video, use_cache = True):
+def get_video_data(video, use_cache = True, createTrainingData = False, showVideo = False):
     ball_sizes = []
 
     extension = "mp4"
@@ -64,7 +65,12 @@ def get_video_data(video, use_cache = True):
         count = 0
         ball_sizes = []  # Ensure it's empty
 
+        # TODO: add progress bar
+
+        progress_bar = tqdm(total=total_frames_in_video, desc="Processing Frames", unit="frame")
+        slowmo = True
         while True:
+            progress_bar.update(1)
             ret, frame = cap.read()
             if not ret:
                 print("End of video or error reading frame.")
@@ -141,6 +147,41 @@ def get_video_data(video, use_cache = True):
                 prev_ball_sizes = ball_sizes[-1]
                 ball_sizes.append(prev_ball_sizes)
 
+            if showVideo:
+            # Draw ellipses and axes on the frame
+                for ball_data in current_frame_data:
+                    x_ellipse, y_ellipse, major, minor, angle_ellipse = ball_data
+                    center = (int(x_ellipse), int(y_ellipse))
+                    axes = (int(major / 2), int(minor / 2))
+                    cv2.ellipse(output, center, axes, angle_ellipse, 0, 360, (255, 255, 255), 2)
+                    # Draw the major axis
+                    cv2.line(output, center, 
+                             (center[0] + int(axes[0] * math.cos(math.radians(angle_ellipse))),
+                              center[1] + int(axes[0] * math.sin(math.radians(angle_ellipse)))), 
+                             (0, 0, 0), 2)
+                    cv2.line(output, center, 
+                             (center[0] - int(axes[0] * math.cos(math.radians(angle_ellipse))),
+                              center[1] - int(axes[0] * math.sin(math.radians(angle_ellipse)))), 
+                             (0, 0, 0), 2)
+
+                    # Draw the minor axis
+                    cv2.line(output, center, 
+                             (center[0] - int(axes[1] * math.sin(math.radians(angle_ellipse))),
+                              center[1] + int(axes[1] * math.cos(math.radians(angle_ellipse)))), 
+                             (128, 128, 128), 2)
+                    cv2.line(output, center, 
+                             (center[0] + int(axes[1] * math.sin(math.radians(angle_ellipse))),
+                              center[1] - int(axes[1] * math.cos(math.radians(angle_ellipse)))), 
+                             (128, 128, 128), 2)
+
+                # Display the current frame count
+                cv2.putText(output, f"Frame: {count}", (50, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 255), 3)
+                # Display the frame with overlays
+                cv2.imshow("Processed Frame", output)
+                if cv2.waitKey(10000 if slowmo else 1) != -1:
+                    # key was pressed, toggle slowmo
+                    slowmo = not slowmo
+
             count += 1
 
         cap.release()
@@ -170,4 +211,26 @@ def get_video_data(video, use_cache = True):
         print("Error: Ball data is not available after attempting load/processing. Exiting.")
         exit()
 
+    if createTrainingData:
+        try:
+            training_data_filepath = f"video_locations/{video}.json"
+            if os.path.exists(training_data_filepath):
+                print(f"Found training data file: {training_data_filepath}. Attempting to load...")
+                with open(training_data_filepath, "r") as f:
+                    training_data = json.load(f)
+                print("Training data loaded successfully.")
+            else:
+                print(f"Training data file {training_data_filepath} does not exist.")
+                training_data = []
+        except Exception as e:
+            print(f"Error loading training data from {training_data_filepath}: {e}")
+            training_data = []
+
+        assert len(training_data) == len(ball_sizes), f"Mismatch in data sizes: training_data ({len(training_data)}) and ball_sizes ({len(ball_sizes)})"
+
+
+
+    if createTrainingData:
+        return ball_sizes, video_info_property, training_data
+    
     return ball_sizes, video_info_property
