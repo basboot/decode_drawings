@@ -8,8 +8,8 @@ from process_video import get_video_data
 
 if __name__ == '__main__':
 
-    VIDEO = "14"
-    ball_information, video_information = get_video_data(VIDEO)
+    VIDEO = "3"
+    ball_information, video_information = get_video_data(VIDEO, use_cache=True, showVideo=True)
     ball_information = np.array(ball_information)
 
     print(f"Number of video frames: {len(ball_information)}")

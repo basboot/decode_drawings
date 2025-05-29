@@ -25,7 +25,7 @@ def _plot_single_subplot_in_grid(ax, x_data, y_data, num_frames, color_indices, 
         ax.axis('equal')
 
 # Main function to create and display the grid of plots
-def plot_data_grid(plot_configurations, num_frames, video_id_str, show_plot = True):
+def plot_data_grid(plot_configurations, num_frames, video_id_str, show_plot = True, output_dir = "output"):
     color_indices = np.arange(num_frames)
     cmap = plt.colormaps.get_cmap('inferno')
     # Normalization factor for cmap, handles num_frames=1 case
@@ -59,6 +59,6 @@ def plot_data_grid(plot_configurations, num_frames, video_id_str, show_plot = Tr
         )
 
     plt.tight_layout()
-    plt.savefig(f"output/decode{video_id_str}.pdf", format="pdf", bbox_inches="tight")
+    plt.savefig(f"{output_dir}/decode{video_id_str}.pdf", format="pdf", bbox_inches="tight")
     if show_plot:
         plt.show()
