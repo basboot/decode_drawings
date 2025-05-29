@@ -9,7 +9,7 @@ from process_video import get_video_data
 if __name__ == '__main__':
 
     VIDEO = "3"
-    ball_information, video_information = get_video_data(VIDEO, use_cache=True, showVideo=True)
+    ball_information, video_information = get_video_data(VIDEO, use_cache=True, showVideo=False)
     ball_information = np.array(ball_information)
 
     print(f"Number of video frames: {len(ball_information)}")
@@ -20,7 +20,7 @@ if __name__ == '__main__':
               video_information['volume'].append(video_information['volume'][-1])
               
     # 1-2 Hz cutoff at least needed to cancel measurement noise
-    # filtering the inpu data does not yield better results
+    # filtering the input data does not yield better results
     # ball_information = butter_lowpass_filter(ball_information, 5, 60, 2)
 
     # filter audio
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     horizontal_offsets = calculate_horizontal_offsets(ball_information, angle_error)
 
-    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_major_axis(ball_information, horizontal_offsets)
+    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_major_axis(ball_information, horizontal_offsets, fix_offset_afterwards=True)
 
 
     # coords_x, coords_y, coords_z = smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average', window_size=5)

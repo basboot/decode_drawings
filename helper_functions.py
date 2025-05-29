@@ -10,27 +10,36 @@ from global_settings import *
 
 
 # calculate error for camera position, based in distances to ball and ball positions for optimization
-def calculate_camera_error(pos, distances, ball_positions):
+def calculate_camera_error(camera_pos, distances, ball_positions, offset_x=None):
     """
     Calculate error between expected distances and actual distances,
     taking into account that camera is looking at triangle center.
     """
-    pos = np.array(pos)
+    camera_pos = np.array(camera_pos) # estimated using distances
+    camera_centered_pos = np.array(camera_pos) # estimated using angles
+    if offset_x is not None:
+        # TODO:
+        camera_centered_pos += offset_x # fix center if camera is not pointing at the center (ignore horiz offset for now)
+
     error = 0
 
-    # Vector from camera to center (viewing direction)
-    to_center = TRIANGLE_CENTER - pos
+    # Vector from centered camera to triangle center (viewing direction)
+    to_center = TRIANGLE_CENTER - camera_centered_pos
     # normalized viewing direction
     to_center = to_center / np.linalg.norm(to_center)
 
     for ball_pos, target_dist in zip(ball_positions, distances):
-        # Vector from camera to ball
-        to_ball = ball_pos - pos
+        # Vector from uncentered camera to ball
+        to_ball = ball_pos - camera_pos
         dist = np.linalg.norm(to_ball)
 
+        # Vector from centered camera to ball
+        to_ball_from_center = ball_pos - camera_centered_pos
+        to_ball_from_center_dist = np.linalg.norm(to_ball_from_center)
+
         # Calculate angle between viewing direction and ball direction
-        to_ball_norm = to_ball / dist
-        cos_angle = np.dot(to_ball_norm, to_center)
+        to_ball_from_center_norm = to_ball_from_center / to_ball_from_center_dist
+        cos_angle = np.dot(to_ball_from_center_norm, to_center)
 
         # Penalize both distance error and deviation from expected viewing angle
         angle_error = 1 - cos_angle  # 0 when looking directly at ball
@@ -42,7 +51,7 @@ def calculate_camera_error(pos, distances, ball_positions):
 
 
 # estimate camera position, using calculate_camera_error
-def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None):
+def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None, offset_x=None):
     """
     Estimate camera position using optimization.
     Takes into account that camera is always looking at triangle center.
@@ -61,14 +70,23 @@ def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None
     result = minimize(
         calculate_camera_error,
         initial_guess,
-        args=(distances, ball_positions),
+        args=(distances, ball_positions, offset_x),
         method='Nelder-Mead'
     )
 
     return result.x
 
+def create_perpendicular_vector_xz(camera_pos):
+    to_center = TRIANGLE_CENTER - camera_pos
+    to_center[1] = 0  # project on x, z
 
-def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None, angle_error=None):
+    # Create a vector perpendicular to to_center in the x-z plane
+    perpendicular_vector = np.array([-to_center[2], 0, to_center[0]])
+    perpendicular_vector = perpendicular_vector / np.linalg.norm(perpendicular_vector)
+
+    return perpendicular_vector
+
+def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None, fix_offset_afterwards=True):
     # major axes are the sizes (for now)
     original_major_axis_red = ball_information[0][0][2]
     original_major_axis_green_green = ball_information[0][1][2]
@@ -110,20 +128,16 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=No
             # now choosing optimization to be able to add extra parameters
             camera_pos = estimate_camera_position(
                 *approx_distances,
-                initial_guess=prev_pos
+                initial_guess=prev_pos,
+                # use previous pos for offset estimation, because we don't know where we are now
+                offset_x=None if fix_offset_afterwards or offset_x is None else create_perpendicular_vector_xz(prev_pos) * offset_x[frame_idx]
             )
 
             # camera_pos = apex_coordinates(*approx_distances)
 
-            # # try to fix position the naive way
-            to_center = TRIANGLE_CENTER - camera_pos
-            to_center[1] = 0  # project on x, z
-
-            # # Create a vector perpendicular to to_center in the x-z plane
-            perpendicular_vector = np.array([-to_center[2], 0, to_center[0]])
-            perpendicular_vector = perpendicular_vector / np.linalg.norm(perpendicular_vector)
-            if offset_x is not None:
-                camera_pos += perpendicular_vector * offset_x[frame_idx]
+            # try to fix position the naive way (afterwards)
+            if offset_x is not None and fix_offset_afterwards:
+                camera_pos += create_perpendicular_vector_xz(camera_pos) * offset_x[frame_idx]
 
 
             
