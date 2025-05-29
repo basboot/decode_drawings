@@ -1,3 +1,4 @@
+from neural_network import NeuralNetwork
 from process_video import get_video_data
 import numpy as np
 
@@ -8,7 +9,7 @@ from sklearn.model_selection import train_test_split
 import os 
 
 
-TEST_PCT = 0.1
+TEST_PCT = 0.01 # use almost everything for training
 
 # Check if GPU is available
 if torch.backends.mps.is_available():
@@ -56,27 +57,9 @@ batch_size = 32 # TODO: tune
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False) # No need to shuffle test data
 
-# TODO: tune NN 
-class SimpleNN(torch.nn.Module):
-    def __init__(self, input_size, output_size):
-        super(SimpleNN, self).__init__()
-        self.fc1 = torch.nn.Linear(input_size, 64)
-        self.relu1 = torch.nn.ReLU()
-        self.fc2 = torch.nn.Linear(64, 32)
-        self.relu2 = torch.nn.ReLU()
-        self.fc3 = torch.nn.Linear(32, output_size)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.relu1(x)
-        x = self.fc2(x)
-        x = self.relu2(x)
-        x = self.fc3(x)
-        return x
-
 input_size = ball_information_flat.shape[1] 
 output_size = location_information.shape[1] 
-model = SimpleNN(input_size, output_size).to(device)
+model = NeuralNetwork(input_size, output_size).to(device)
 print(model)
 
 # Loss function and Optimizer
