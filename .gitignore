@@ -5,6 +5,8 @@ videos
 *.txt
 *.json
 *.pdf
+# pytorch models
+*.pth
 
 # Created by https://www.toptal.com/developers/gitignore/api/jetbrains+all,visualstudiocode,python,venv
 # Edit at https://www.toptal.com/developers/gitignore?templates=jetbrains+all,visualstudiocode,python,venv
