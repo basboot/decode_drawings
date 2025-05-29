@@ -98,7 +98,7 @@ plot_configs = [
 ]
 
 # plot data
-plot_data_grid(plot_configs, len(coords), VIDEO, show_plot=True)
+plot_data_grid(plot_configs, len(coords), VIDEO, show_plot=True, output_dir="output_ai")
 
 with open(f"drawings_ai/drawing{VIDEO}.txt", "w") as f:
     for x, z in zip(drawing_x, drawing_y):
