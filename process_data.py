@@ -9,7 +9,7 @@ from process_video import get_video_data
 if __name__ == '__main__':
 
     VIDEO = "3"
-    ball_information, video_information = get_video_data(VIDEO, use_cache=True, showVideo=False)
+    ball_information, video_information = get_video_data(VIDEO, use_cache=True, showVideo=False, saveFrames=False)
     ball_information = np.array(ball_information)
 
     print(f"Number of video frames: {len(ball_information)}")
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     poly_coefficients = np.polyfit(frames_indices, angles_to_plot, poly_degree)
     angles_to_plot_polyfit = np.polyval(poly_coefficients, frames_indices)
 
-    pole_length = 18  # cm
+    pole_length = POLE_SIZE  # cm
     pole_displacement = pole_length * np.deg2rad(angles_to_plot)
 
     angles_to_plot_ft = butter_lowpass_filter(angles_to_plot, 0.5, 60, 2)
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     horizontal_offsets = calculate_horizontal_offsets(ball_information, angle_error)
 
-    coords_x, coords_y, coords_z = calculate_camera_positions_from_rgb_major_axis(ball_information, horizontal_offsets, fix_offset_afterwards=True)
+    coords_x, coords_y, coords_z, v_angles, v_corrections = calculate_camera_positions_from_rgb_minor_axis(ball_information, horizontal_offsets, fix_offset_afterwards=True)
 
 
     # coords_x, coords_y, coords_z = smooth_trajectory_data(coords_x, coords_y, coords_z, method='moving_average', window_size=5)
@@ -119,6 +119,19 @@ if __name__ == '__main__':
             "xlabel": 'Frame', "ylabel": 'error', "title": 'green-blue angle error',
             "marker": '.', "marker_size": 30, "color": None, 
         },
+
+                                {
+            "x_data": frames_indices, "y_data": v_angles,
+            "xlabel": 'Frame', "ylabel": 'error', "title": 'vertical angle error',
+            "marker": '.', "marker_size": 30, "color": None, 
+        },
+
+                                        {
+            "x_data": frames_indices, "y_data": v_corrections,
+            "xlabel": 'Frame', "ylabel": 'error', "title": 'vertical distance error',
+            "marker": '.', "marker_size": 30, "color": None, 
+        },
+
 
     ]
 

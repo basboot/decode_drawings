@@ -11,14 +11,10 @@ from global_settings import *
 
 # calculate error for camera position, based in distances to ball and ball positions for optimization
 def calculate_camera_error(camera_pos, distances, ball_positions, offset_x=None):
-    """
-    Calculate error between expected distances and actual distances,
-    taking into account that camera is looking at triangle center.
-    """
     camera_pos = np.array(camera_pos) # estimated using distances
     camera_centered_pos = np.array(camera_pos) # estimated using angles
     if offset_x is not None:
-        # TODO:
+        # TODO: find out why it works better to fix offset afterwards
         camera_centered_pos += offset_x # fix center if camera is not pointing at the center (ignore horiz offset for now)
 
     error = 0
@@ -45,17 +41,14 @@ def calculate_camera_error(camera_pos, distances, ball_positions, offset_x=None)
         angle_error = 1 - cos_angle  # 0 when looking directly at ball
         dist_error = (dist - target_dist) ** 2
 
-        error += dist_error + 5 * angle_error  # Weight angle error more
+        error += dist_error + 5 * angle_error  # Weight angle error more TODO: experiment
 
     return error
 
 
 # estimate camera position, using calculate_camera_error
+# assumes camera is looking at center of traingle
 def estimate_camera_position(red_dist, green_dist, blue_dist, initial_guess=None, offset_x=None):
-    """
-    Estimate camera position using optimization.
-    Takes into account that camera is always looking at triangle center.
-    """
 
     ball_positions = [RED_POSITION, GREEN_POSITION, BLUE_POSITION]
 
@@ -86,40 +79,45 @@ def create_perpendicular_vector_xz(camera_pos):
 
     return perpendicular_vector
 
-def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=None, fix_offset_afterwards=True):
-    # major axes are the sizes (for now)
-    original_major_axis_red = ball_information[0][0][2]
-    original_major_axis_green_green = ball_information[0][1][2]
-    original_major_axis_blue = ball_information[0][2][2]
+def estimate_ball_distance(current_size, original_size, original_distance):
+    pass
+
+def calculate_camera_positions_from_rgb_minor_axis(ball_information, offset_x=None, fix_offset_afterwards=True):
+    # minor axes are the sizes (for now)
+    original_minor_axis_red = ball_information[0][0][2]
+    original_minor_axis_green_green = ball_information[0][1][2]
+    original_minor_axis_blue = ball_information[0][2][2]
 
     # use average size from 1st frame as reference, to account for camera not exactly in the middle
-    original_ball_size = (original_major_axis_red + original_major_axis_green_green + original_major_axis_blue) / 3
+    original_ball_size = (original_minor_axis_red + original_minor_axis_green_green + original_minor_axis_blue) / 3
 
-    original_major_axis_red = original_ball_size
-    original_major_axis_green_green = original_ball_size
-    original_major_axis_blue = original_ball_size
+    original_minor_axis_red = original_ball_size
+    original_minor_axis_green_green = original_ball_size
+    original_minor_axis_blue = original_ball_size
         
 
-    coords_x, coords_y, coords_z = [], [], []
+    coords_x, coords_y, coords_z, v_angles, v_corrections = [], [], [], [], []
     prev_pos = INITIAL_CAMERA_POSITION  # Use previous position as initial guess for next frame
 
     for frame_idx, frame_ball_data in enumerate(ball_information):
         red_data, green_data, blue_data = frame_ball_data[0], frame_ball_data[1], frame_ball_data[2]
 
-        _, _, red_size, _, _= red_data
-        _, _, green_size, _, _ = green_data
-        _, _, blue_size, _, _ = blue_data
+        _, red_y, red_size, _, _= red_data
+        _, green_y , green_size, _, _ = green_data
+        _, blue_y, blue_size, _, _ = blue_data
+
+        v_angle, v_correction = 0, 0
 
 
         try:
             approx_distances = []
             current_sizes = [red_size, green_size, blue_size]
-            original_s = [original_major_axis_red, original_major_axis_green_green, original_major_axis_blue]
+            original_s = [original_minor_axis_red, original_minor_axis_green_green, original_minor_axis_blue]
 
             for i in range(3):
                 size = current_sizes[i]
                 orig_s = original_s[i]
-                dist = INITIAL_BALL_DISTANCE[i] * (orig_s / size)
+                dist = INITIAL_BALL_DISTANCE[i] * (orig_s / size) # TODO: improve distance function
                 
                 approx_distances.append(dist)
 
@@ -139,8 +137,26 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=No
             if offset_x is not None and fix_offset_afterwards:
                 camera_pos += create_perpendicular_vector_xz(camera_pos) * offset_x[frame_idx]
 
+                # TODO: use size difference to compensate camera_y
+                camera_y = (red_y + ((green_y + blue_y) / 2)) / 2
+                # offset from principle point
+                # Be aware that Y is reversed, so we reverse this!
+                camera_y_offset = K[1, 2] - camera_y
 
-            
+
+                # use estimated distance and camera angle (from vertical offset) to
+                # calculate distance error
+                distance = np.linalg.norm(np.array([camera_pos[0], camera_pos[2]]))
+                v_angle = camera_y_offset / 720 * 60
+                camera_y_offset_radians = math.radians(v_angle) * 1
+                error = distance * math.sin(camera_y_offset_radians)
+                unit_vector = np.array([camera_pos[0], camera_pos[2]]) / distance
+                real_position = np.array([camera_pos[0], camera_pos[2]]) + unit_vector * error
+                v_correction = error
+
+
+                camera_pos[0], camera_pos[2] = real_position
+                
 
             prev_pos = camera_pos
 
@@ -149,17 +165,19 @@ def calculate_camera_positions_from_rgb_major_axis(ball_information, offset_x=No
             coords_x.append(x)
             coords_y.append(y)
             coords_z.append(z)
+            v_angles.append(v_angle)
+            v_corrections.append(v_correction)
             # Angle is handled at the start of the loop for this frame
 
         except Exception as e:
             print(f"Error processing frame {frame_idx} for 3D estimation: {e}")
-            x, y, z = prev_pos
-            coords_x.append(x)
-            coords_y.append(y)
-            coords_z.append(z)
-    return coords_x, coords_y, coords_z
+            exit()
+
+    return coords_x, coords_y, coords_z, v_angles, v_corrections
 
 
+# calculate angle of side between green and blue (used), 
+# and estimate distance based on size (not used anymore)
 def analyze_green_blue_ball(ball_information):
     original_green_x = ball_information[0][1][0]
     original_blue_x = ball_information[0][2][0]
@@ -184,6 +202,8 @@ def analyze_green_blue_ball(ball_information):
     return green_blue_angles, green_blue_distances
 
 
+# calculate horizontal error based on assumption that the red ball should be in the middle
+# of the screen
 def calculate_horizontal_offsets(ball_information, angle_error=None):
     horizontal_offsets = []
 
@@ -194,6 +214,7 @@ def calculate_horizontal_offsets(ball_information, angle_error=None):
         green_x, green_y, _, _, _ = green_data
         blue_x, blue_y, _, _, _ = blue_data
 
+        # rotate image around center, to compensate for a tilted camera
         if angle_error is not None:
             # Create rotation matrix for the given angle
             angle_rad = np.radians(-angle_error[frame_idx])
@@ -252,8 +273,6 @@ def get_audio_levels_per_frame(video_path):
     audio_clip = audio.to_soundarray()
     frame_duration = len(audio_clip) // n_frames
 
-    # TODO: CHECK frame duration!
-
     # Loop over each video frame time
     for i in range(n_frames):
         t_start = i * frame_duration
@@ -265,14 +284,12 @@ def get_audio_levels_per_frame(video_path):
         if samples.ndim == 2:
             samples = samples.mean(axis=1)
 
-        # Calculate RMS volume (can use other metrics)
+        # Calculate RMS volume 
         rms = np.sqrt(np.mean(samples ** 2))
         db = 20 * np.log10(rms + 1e-10)  # dB, avoid log(0)
 
         levels.append(db)
 
-    # print(levels)
-    # print(len(levels))
 
     return levels
 
@@ -292,8 +309,8 @@ def calculate_horizontal_distance_from_center(left_x, right_x, mid_x, desired_x)
 
     cross_ratio = num / den
 
-    a_real = 0
-    b_real = TRIANGLE_SIZE
+    a_real = CENTER_X - TRIANGLE_SIZE / 2
+    b_real = CENTER_X + TRIANGLE_SIZE / 2
     c_real = CENTER_X
 
     d_real = (a_real - b_real) / ((cross_ratio * (c_real - b_real)) / (c_real - a_real) - 1) + a_real 
@@ -301,4 +318,3 @@ def calculate_horizontal_distance_from_center(left_x, right_x, mid_x, desired_x)
     return d_real - CENTER_X
 
 
-    
