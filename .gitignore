@@ -1,5 +1,6 @@
 # exclude videos from Radu
 videos
+test
 
 # exclude results
 *.txt
