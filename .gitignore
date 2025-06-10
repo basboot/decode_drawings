@@ -1,6 +1,7 @@
 # exclude videos from Radu
 videos
 test
+frames
 
 # exclude results
 *.txt
