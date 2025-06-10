@@ -6,6 +6,36 @@ import json  # Added for saving data
 import os  # Added for checking file existence
 
 
+# https://amroamroamro.github.io/mexopencv/matlab/cv.fitEllipse.html
+def ellipse_to_conic_matrix(xc, yc, width, height, angle_deg):
+    a = width / 2
+    b = height / 2
+    theta = -np.radians(angle_deg)  # clockwise to counterclockwise
+
+    # Rotation matrix
+    R = np.array([[np.cos(theta), -np.sin(theta)],
+                  [np.sin(theta),  np.cos(theta)]])
+
+    # Diagonal matrix with inverse squares
+    D = np.diag([1 / a**2, 1 / b**2])
+
+    # Conic part in 2D
+    C_2x2 = R.T @ D @ R
+
+    # Center
+    c = np.array([xc, yc])
+    C_2 = -C_2x2 @ c
+    C_3 = c.T @ C_2x2 @ c - 1
+
+    # Final 3x3 conic matrix using numpy
+    C = np.block([
+        [C_2x2, C_2.reshape(2,1)],
+        [C_2.reshape(1,2), np.array([[C_3]])]
+    ])
+
+    return C
+
+
 from global_settings import *
 from helper_functions import *
 from tqdm import tqdm
@@ -13,7 +43,7 @@ from tqdm import tqdm
 
 # processes the given video (only use the number of the video 1-6) and returns original_ball_sizes, ball_sizes
 # also saves the data to disc, and tries to reuse unless use_cache = False
-def get_video_data(video, use_cache = True, createTrainingData = False, showVideo = False):
+def get_video_data(video, use_cache = True, createTrainingData = False, showVideo = False, saveFrames = False):
     ball_sizes = []
 
     extension = "mp4"
@@ -76,6 +106,13 @@ def get_video_data(video, use_cache = True, createTrainingData = False, showVide
                 print("End of video or error reading frame.")
                 break
 
+            # Save first and last frame as a PNG image for visual comparison
+            if saveFrames and (count == 0 or count == total_frames_in_video - 1):
+                frame_filename = f"frames/video_{video}_frame_{count:04d}.png"
+                os.makedirs("frames", exist_ok=True)  # Ensure the directory exists
+                cv2.imwrite(frame_filename, frame)
+     
+
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             lower_red1 = np.array([0, 100, 100])
             upper_red1 = np.array([10, 255, 255])
@@ -128,9 +165,13 @@ def get_video_data(video, use_cache = True, createTrainingData = False, showVide
                     ellipse = cv2.fitEllipse(largest_contour)
                     # print(f"Frame: {count} #points {len(largest_contour)}", lengths)
                     cv2.ellipse(output, ellipse, (0, 255, 0), 2)
-                    (x_ellipse, y_ellipse), (major, minor), angle_ellipse = ellipse
+                    (x_ellipse, y_ellipse), (minor, major), angle_ellipse = ellipse
 
-                    ball_data = [x_ellipse, y_ellipse, major, minor, angle_ellipse]
+                    if minor > major:
+                        print(f"WARNING: minor and major axes reversed in frame {count}")
+
+                    ball_data = [x_ellipse, y_ellipse, minor, major, angle_ellipse]
+
                     current_frame_data.append(ball_data)
 
                     ball_found_for_color = True
@@ -147,37 +188,46 @@ def get_video_data(video, use_cache = True, createTrainingData = False, showVide
                 prev_ball_sizes = ball_sizes[-1]
                 ball_sizes.append(prev_ball_sizes)
 
+
             if showVideo:
+                if slowmo:
+                    print("Data for red, green, blue:")
             # Draw ellipses and axes on the frame
                 for ball_data in current_frame_data:
-                    x_ellipse, y_ellipse, major, minor, angle_ellipse = ball_data
+                    x_ellipse, y_ellipse, minor, major, angle_ellipse = ball_data
+
+                    if slowmo:
+                        print(ball_data)
+
                     center = (int(x_ellipse), int(y_ellipse))
-                    axes = (int(major / 2), int(minor / 2))
+                    axes = (int(minor / 2), int(major / 2))
                     cv2.ellipse(output, center, axes, angle_ellipse, 0, 360, (255, 255, 255), 2)
-                    # Draw the major axis
+                            
+                    # Draw the minor axis
                     cv2.line(output, center, 
                              (center[0] + int(axes[0] * math.cos(math.radians(angle_ellipse))),
                               center[1] + int(axes[0] * math.sin(math.radians(angle_ellipse)))), 
-                             (0, 0, 0), 2)
+                             (128, 128, 128), 2)
                     cv2.line(output, center, 
                              (center[0] - int(axes[0] * math.cos(math.radians(angle_ellipse))),
                               center[1] - int(axes[0] * math.sin(math.radians(angle_ellipse)))), 
-                             (0, 0, 0), 2)
+                             (128, 128, 128), 2)
 
-                    # Draw the minor axis
+                    # Draw the major axis
                     cv2.line(output, center, 
                              (center[0] - int(axes[1] * math.sin(math.radians(angle_ellipse))),
                               center[1] + int(axes[1] * math.cos(math.radians(angle_ellipse)))), 
-                             (128, 128, 128), 2)
+                             (0, 0, 0), 2)
                     cv2.line(output, center, 
                              (center[0] + int(axes[1] * math.sin(math.radians(angle_ellipse))),
                               center[1] - int(axes[1] * math.cos(math.radians(angle_ellipse)))), 
-                             (128, 128, 128), 2)
+                             (0, 0, 0), 2)
 
                 # Display the current frame count
                 cv2.putText(output, f"Frame: {count}", (50, 70), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 255), 3)
                 # Display the frame with overlays
                 cv2.imshow("Processed Frame", output)
+                
                 if cv2.waitKey(10000 if slowmo else 1) != -1:
                     # key was pressed, toggle slowmo
                     slowmo = not slowmo
