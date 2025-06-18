@@ -16,6 +16,42 @@ https://radufromfinland.com/decodeTheDrawings/
 - `video_locations/` - metadata for simulated videos used to train neural network
 - `videos/` - videos from Radu and simulation data
 
+## Usage
+
+To decode drawings from videos, you need to put Radu's videos in `videos/` and follow these steps:
+
+1. **Process video data**: Run the main processing script to extract ball positions and audio data:
+   ```bash
+   python process_data.py
+   ```
+2. **Train neural network** (optional): If you want to use the AI approach:
+   ```bash
+   python train_nn.py
+   ```
+3. **Make predictions**: Use the trained model to predict drawings:
+   ```bash
+   python predict_nn.py
+   ```
+
+Modify `VIDEO` to select the video to process, modify `MODEL` (predictions only) to select the video the model was
+trained on:
+
+```python
+  VIDEO = "1"  # Change to process different videos
+```
+
+### Output
+
+- Decoded drawings are saved as text files in `drawings/` (traditional approach) or `drawings_ai/` (neural network
+  approach)
+- Visualization plots are generated in `output/` or `output_ai/`
+- Each line in the drawing files contains x,z coordinates of the pen position
+
+### Configuration
+
+- Adjust parameters in `global_settings.py` for different camera setups or ball configurations
+- Modify filtering and processing parameters in the respective processing scripts
+
 ## Languages
 
 - Python (for analysis)
