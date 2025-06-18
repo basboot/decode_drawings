@@ -42,7 +42,7 @@ The horizontal offset estimation was also validated using the simulation.
 
 ## Camera Intrinsics
 
-Both OpenCV and mathematical approaches failed at estimating the camera intrinsics (shame on me! 😅).
+Both OpenCV and mathematical approaches failed at estimating the camera intrinsics - shame on me! :-(
 
 I therefore used a ruler and visually estimated the horizontal field of view at 60 degrees, assuming square pixels and
 an intrinsic point exactly at the center of the screen.
