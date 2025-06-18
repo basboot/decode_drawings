@@ -16,9 +16,31 @@ https://radufromfinland.com/decodeTheDrawings/
 - `video_locations/` - metadata for simulated videos used to train neural network
 - `videos/` - videos from Radu and simulation data
 
-## Usage
+## Installation
 
-To decode drawings from videos, you need to put Radu's videos in `videos/` and follow these steps:
+### Python Setup
+
+1. **Install Python 3.12+** (if not already installed, lower might also work)
+2. **Install required Python packages:**
+   ```bash
+   pip install opencv-python numpy scipy matplotlib moviepy torch tqdm scikit-learn
+   ```
+
+### JavaScript Setup (for simulation)
+
+1. **Install Node.js** (if not already installed)
+2. **Navigate to the JavaScript directory and install dependencies:**
+   ```bash
+   cd javascript
+   npm install
+   ```
+
+### Data Setup
+
+- Place Radu's video files in the `videos/` directory
+- Videos should be named as `1.mp4`, `2.mp4`, etc., or `1.webm`, `2.webm`, etc.
+
+## Usage
 
 1. **Process video data**: Run the main processing script to extract ball positions and audio data:
    ```bash
@@ -34,12 +56,13 @@ To decode drawings from videos, you need to put Radu's videos in `videos/` and f
    python predict_nn.py
    ```
 
-4. **Run JavaScript simulation** (optional): To validate approaches or generate training data, you can select or change
-   the animations. Run simulation with:
-
-```bash
-  npm run dev
-```
+4. **Run JavaScript simulation** (optional): To validate approaches or generate training data:
+   ```bash
+   cd javascript
+   npm run dev
+   ```
+   This will start a Vite development server. Open the provided local URL (usually `http://localhost:5173`) in your
+   browser to run the 3D simulation.
 
 Modify `VIDEO` to select the video to process, modify `MODEL` (predictions only) to select the video the model was
 trained on:
