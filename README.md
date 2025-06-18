@@ -29,9 +29,12 @@ To decode drawings from videos, you need to put Radu's videos in `videos/` and f
    python train_nn.py
    ```
 3. **Make predictions**: Use the trained model to predict drawings:
+
    ```bash
    python predict_nn.py
    ```
+
+4. **Run JavaScript simulation** (optional): To validate approaches or generate training data, you can select or change
 
 Modify `VIDEO` to select the video to process, modify `MODEL` (predictions only) to select the video the model was
 trained on:
