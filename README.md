@@ -113,7 +113,7 @@ The horizontal offset estimation was also validated using the simulation.
 Both OpenCV and mathematical approaches failed at estimating the camera intrinsics - shame on me! :-(
 
 I therefore used a ruler and visually estimated the horizontal field of view at 60 degrees, assuming square pixels and
-an intrinsic point exactly at the center of the screen.
+a principal point exactly at the center of the screen.
 
 ## Image Processing
 
@@ -123,9 +123,9 @@ ellipses. OpenCV can find contours, fit ellipses, and extract the center and axe
 ## Reconstructing Camera Position
 
 Under the assumption that the camera starts 18cm in front of the centroid of the equilateral triangle, the initial ball
-sizes in pixels are used to calculate the distances from the balls to the camera, using the fact that size is inversely
-proportional to distance. These 3 distances, combined with the known viewing angle and ball positions, are used to
-reconstruct the apex of the viewing 'pyramid'.
+sizes in pixels of the minor axes are used to calculate the distances from the balls to the camera, using the fact that
+size is inversely proportional to distance. These 3 distances, combined with the known viewing angle and ball
+positions, are used to reconstruct the apex of the viewing 'pyramid'.
 
 ## Correcting Errors
 
