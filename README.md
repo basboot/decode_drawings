@@ -42,7 +42,8 @@ https://radufromfinland.com/decodeTheDrawings/
 
 ## Usage
 
-1. **Process video data**: Run the main processing script to extract ball positions and audio data:
+1. **Process video data**: Run the main processing script. This extracts ball positions and audio data, and creates a
+   plot + point data of the the result:
    ```bash
    python process_data.py
    ```
@@ -50,7 +51,7 @@ https://radufromfinland.com/decodeTheDrawings/
    ```bash
    python train_nn.py
    ```
-3. **Make predictions**: Use the trained model to predict drawings:
+3. **Make predictions**: Use the trained model to predict drawings. This creates a plot + point data of the result:
 
    ```bash
    python predict_nn.py
