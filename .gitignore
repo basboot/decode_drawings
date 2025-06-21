@@ -2,6 +2,7 @@
 videos
 test
 frames
+.DS_Store
 
 # exclude results
 *.txt
