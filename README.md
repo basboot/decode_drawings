@@ -167,8 +167,10 @@ improvement came from normalizing the data to the range [-1, 1] around the scree
 to 3 hidden layers also improved results, indicating there was (and might still be) overfitting to the simulated
 training data.
 
-**Fun fact**: I also tried using real video 1 (a perfect circle) as training data, which resulted in a prediction of a
-morphed star—still much better than expected! Perhaps training on a five-pointed star could improve this approach.
+<img width="515" alt="Scherm­afbeelding 2025-06-18 om 21 14 19" src="https://github.com/user-attachments/assets/e6cc5920-1f21-4ccd-9281-150297bd6694" />
+
+**Fun fact**: I also tried using real video 1 (under the assumption that Radu has drawn a perfect circle with constant speed) as training data for the network, and used it to predict the star. The result - a
+morphed star -  was far from perfect, but at the same time far better than expected! Perhaps using the (perfect) five-pointed star as training data (tune the corners!) could be an affective approach.
 
 **Note**: The AI has not learned to detect pen lifting; instead, I used the audio analysis approach as in the non-AI
 decodings.
